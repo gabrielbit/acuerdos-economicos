@@ -14,8 +14,12 @@ export async function buildApp() {
     logger: true,
   });
 
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
+    : ['http://localhost:5173'];
+
   await fastify.register(cors, {
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    origin: corsOrigin,
     credentials: true,
   });
 

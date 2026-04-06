@@ -81,7 +81,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
     );
     const user = result.rows[0];
     return {
-      ...user,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      familyId: request.user.familyId,
       permissions: buildPermissions(user),
     };
   });

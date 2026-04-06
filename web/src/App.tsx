@@ -8,6 +8,7 @@ import FamilyList from './screens/committee/FamilyList';
 import AgreementForm from './screens/committee/AgreementForm';
 import FamilyNew from './screens/committee/FamilyNew';
 import Config from './screens/committee/Config';
+import Users from './screens/committee/Users';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -34,6 +35,7 @@ function AppRoutes() {
         <Route path="/familias/:id" element={<FamilyDetail />} />
         <Route path="/familias/:familyId/nuevo-acuerdo" element={<AgreementForm />} />
         <Route path="/configuracion" element={<Config />} />
+        <Route path="/usuarios" element={<Users />} />
       </Route>
     </Routes>
   );

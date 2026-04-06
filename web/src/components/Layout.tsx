@@ -1,14 +1,15 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
-const navItems = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/familias', label: 'Familias' },
-  { to: '/configuracion', label: 'Configuración' },
-];
-
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, can } = useAuth();
+
+  const navItems = [
+    { to: '/', label: 'Dashboard' },
+    { to: '/familias', label: 'Familias' },
+    { to: '/configuracion', label: 'Configuración' },
+    ...(can('canManageUsers') ? [{ to: '/usuarios', label: 'Usuarios' }] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import type { User } from '../types';
+import type { User, UserPermissions } from '../types';
 import { api } from '../services/api';
 
 interface AuthContextType {
@@ -8,6 +8,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  can: (permission: keyof UserPermissions) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -40,8 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const can = useCallback((permission: keyof UserPermissions) => {
+    return user?.permissions?.[permission] ?? false;
+  }, [user]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, can }}>
       {children}
     </AuthContext.Provider>
   );

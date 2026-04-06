@@ -2,10 +2,19 @@ import fp from 'fastify-plugin';
 import fastifyJwt from '@fastify/jwt';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 
+export interface UserPermissions {
+  canManageFamilies: boolean;
+  canManageAgreements: boolean;
+  canChangeStatus: boolean;
+  canManageUsers: boolean;
+  canComment: boolean;
+}
+
 export interface JwtPayload {
   userId: number;
   role: 'committee' | 'family';
   familyId: number | null;
+  permissions: UserPermissions;
 }
 
 declare module '@fastify/jwt' {
@@ -14,6 +23,8 @@ declare module '@fastify/jwt' {
     user: JwtPayload;
   }
 }
+
+type PermissionKey = keyof UserPermissions;
 
 export default fp(async (fastify: FastifyInstance) => {
   fastify.register(fastifyJwt, {
@@ -39,11 +50,28 @@ export default fp(async (fastify: FastifyInstance) => {
       reply.status(401).send({ error: 'No autorizado' });
     }
   });
+
+  fastify.decorate('requirePermission', (permission: PermissionKey) => {
+    return async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await request.jwtVerify();
+        if (request.user.role !== 'committee') {
+          return reply.status(403).send({ error: 'Acceso restringido a la comisión' });
+        }
+        if (!request.user.permissions?.[permission]) {
+          return reply.status(403).send({ error: 'No tenés permisos para esta acción' });
+        }
+      } catch {
+        reply.status(401).send({ error: 'No autorizado' });
+      }
+    };
+  });
 });
 
 declare module 'fastify' {
   interface FastifyInstance {
     requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     requireCommittee: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requirePermission: (permission: PermissionKey) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }

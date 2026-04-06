@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 import type { Family } from '../../types';
 
 function formatMoney(amount: number): string {
@@ -59,6 +60,7 @@ function SortHeader({ label, sortKey, current, direction, onSort, align }: {
 }
 
 export default function FamilyList() {
+  const { can } = useAuth();
   const [families, setFamilies] = useState<Family[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
@@ -113,10 +115,12 @@ export default function FamilyList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Familias</h1>
-        <Link to="/familias/nueva"
-          className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
-          + Nueva familia
-        </Link>
+        {can('canManageFamilies') && (
+          <Link to="/familias/nueva"
+            className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
+            + Nueva familia
+          </Link>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200">

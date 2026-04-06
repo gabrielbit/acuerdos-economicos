@@ -1,9 +1,18 @@
+export interface UserPermissions {
+  canManageFamilies: boolean;
+  canManageAgreements: boolean;
+  canChangeStatus: boolean;
+  canManageUsers: boolean;
+  canComment: boolean;
+}
+
 export interface User {
   id: number;
   email: string;
   name: string;
   role: 'committee' | 'family';
   familyId: number | null;
+  permissions: UserPermissions;
 }
 
 export interface Family {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 import type { Family, Student, Agreement, AgreementStudent, Comment } from '../../types';
 
 function formatMoney(amount: number): string {
@@ -42,6 +43,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 export default function FamilyDetail() {
+  const { can } = useAuth();
   const { id } = useParams<{ id: string }>();
   const [family, setFamily] = useState<(Family & { students: Student[] }) | null>(null);
   const [agreement, setAgreement] = useState<Agreement | null>(null);
@@ -247,14 +249,16 @@ export default function FamilyDetail() {
                     {status.label}
                   </span>
                 )}
-                {!agreement && (
+                {!agreement && can('canManageAgreements') && (
                   <Link to={`/familias/${family.id}/nuevo-acuerdo`}
                     className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
                     Crear acuerdo
                   </Link>
                 )}
-                <button onClick={startEditingFamily}
-                  className="text-xs text-gray-400 hover:text-gray-600">Editar</button>
+                {can('canManageFamilies') && (
+                  <button onClick={startEditingFamily}
+                    className="text-xs text-gray-400 hover:text-gray-600">Editar</button>
+                )}
               </div>
             </div>
 
@@ -280,10 +284,12 @@ export default function FamilyDetail() {
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-sm font-medium text-gray-900">Estudiantes</h2>
-          <button onClick={() => setShowAddStudent(!showAddStudent)}
-            className="text-xs text-gray-500 hover:text-gray-700">
-            {showAddStudent ? 'Cancelar' : '+ Agregar'}
-          </button>
+          {can('canManageFamilies') && (
+            <button onClick={() => setShowAddStudent(!showAddStudent)}
+              className="text-xs text-gray-500 hover:text-gray-700">
+              {showAddStudent ? 'Cancelar' : '+ Agregar'}
+            </button>
+          )}
         </div>
         {showAddStudent && (
           <div className="p-4 border-b border-gray-100 bg-gray-50">
@@ -345,7 +351,7 @@ export default function FamilyDetail() {
             <h2 className="text-sm font-medium text-gray-900">Acuerdo actual</h2>
             <div className="flex items-center gap-3">
               <span className="text-sm text-gray-500">{agreement.discount_percentage}% de descuento</span>
-              {!editing && (
+              {!editing && can('canManageAgreements') && (
                 <>
                   <button onClick={startEditing}
                     className="text-xs text-gray-400 hover:text-gray-600">Editar</button>
@@ -460,6 +466,7 @@ export default function FamilyDetail() {
             </h2>
           </div>
 
+          {can('canComment') && (
           <div className="p-4 border-b border-gray-100">
             <div className="flex gap-3">
               <textarea
@@ -480,6 +487,7 @@ export default function FamilyDetail() {
             </div>
             <p className="text-xs text-gray-400 mt-1">Enter para enviar, Shift+Enter para nueva línea</p>
           </div>
+          )}
 
           {comments.length === 0 ? (
             <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin comentarios aún</p>

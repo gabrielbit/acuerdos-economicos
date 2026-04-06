@@ -75,7 +75,7 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
 
   // Crear acuerdo — calcula automáticamente montos por estudiante
   fastify.post('/api/agreements', {
-    preHandler: [fastify.requireCommittee],
+    preHandler: [fastify.requirePermission('canManageAgreements')],
   }, async (request) => {
     const data = createAgreementSchema.parse(request.body);
     const client = await fastify.db.connect();
@@ -157,7 +157,7 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
 
   // Actualizar acuerdo
   fastify.put('/api/agreements/:id', {
-    preHandler: [fastify.requireCommittee],
+    preHandler: [fastify.requirePermission('canManageAgreements')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const data = createAgreementSchema.partial().parse(request.body);
@@ -240,7 +240,7 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
 
   // Cambiar estado
   fastify.patch('/api/agreements/:id/status', {
-    preHandler: [fastify.requireCommittee],
+    preHandler: [fastify.requirePermission('canChangeStatus')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { status } = z.object({ status: z.enum(['pendiente', 'en_definicion', 'asignado', 'rechazado', 'suspendido']) })
@@ -268,7 +268,7 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
 
   // Eliminar acuerdo
   fastify.delete('/api/agreements/:id', {
-    preHandler: [fastify.requireCommittee],
+    preHandler: [fastify.requirePermission('canManageAgreements')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
 

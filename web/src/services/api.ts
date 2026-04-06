@@ -106,4 +106,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),
+
+  // Usuarios
+  getUsers: () => request<Record<string, unknown>[]>('/users'),
+
+  createUser: (data: { email: string; name: string; password: string; can_manage_families?: boolean; can_manage_agreements?: boolean; can_change_status?: boolean; can_manage_users?: boolean; can_comment?: boolean }) =>
+    request<Record<string, unknown>>('/users', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateUser: (id: number, data: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  deleteUser: (id: number) =>
+    request<{ ok: boolean }>(`/users/${id}`, { method: 'DELETE' }),
 };

@@ -68,7 +68,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
 
   // Crear familia
   fastify.post('/api/families', {
-    preHandler: [fastify.requireCommittee],
+    preHandler: [fastify.requirePermission('canManageFamilies')],
   }, async (request) => {
     const data = createFamilySchema.parse(request.body);
     const result = await fastify.db.query(
@@ -82,7 +82,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
 
   // Actualizar familia
   fastify.put('/api/families/:id', {
-    preHandler: [fastify.requireCommittee],
+    preHandler: [fastify.requirePermission('canManageFamilies')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const data = createFamilySchema.partial().parse(request.body);
@@ -128,7 +128,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
 
   // Crear estudiante
   fastify.post('/api/families/:id/students', {
-    preHandler: [fastify.requireCommittee],
+    preHandler: [fastify.requirePermission('canManageFamilies')],
   }, async (request) => {
     const { id } = request.params as { id: string };
     const data = createStudentSchema.parse(request.body);

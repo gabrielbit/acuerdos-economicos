@@ -23,7 +23,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
 
   // Agregar comentario
   fastify.post('/api/agreements/:id/comments', {
-    preHandler: [fastify.requireAuth],
+    preHandler: [fastify.requirePermission('canComment')],
   }, async (request) => {
     const { id } = request.params as { id: string };
     const { content } = createCommentSchema.parse(request.body);

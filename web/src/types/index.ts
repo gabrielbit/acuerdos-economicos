@@ -1,0 +1,101 @@
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+  role: 'committee' | 'family';
+  familyId: number | null;
+}
+
+export interface Family {
+  id: number;
+  name: string;
+  parent_names: string | null;
+  email: string | null;
+  phone: string | null;
+  user_id: number | null;
+  created_at: string;
+  student_count?: number;
+  agreement_status?: string;
+  discount_percentage?: number;
+  total_tuition?: number;
+  total_to_pay?: number;
+  total_discount?: number;
+}
+
+export interface Student {
+  id: number;
+  family_id: number;
+  name: string;
+  level: 'jardin' | 'primaria' | 'secundaria' | '12vo';
+  grade: string;
+  file_number: string | null;
+}
+
+export interface AidPeriod {
+  id: number;
+  name: string;
+  start_month: number;
+  end_month: number;
+  year: number;
+  total_budget: number;
+  is_active: boolean;
+}
+
+export interface TuitionRate {
+  id: number;
+  period_id: number;
+  level: string;
+  tuition_amount: number;
+  extras_amount: number;
+}
+
+export interface Agreement {
+  id: number;
+  family_id: number;
+  period_id: number;
+  status: 'pendiente' | 'en_definicion' | 'asignado' | 'rechazado' | 'suspendido';
+  discount_percentage: number;
+  observations: string | null;
+  approved_by: number | null;
+  created_at: string;
+  updated_at: string;
+  students?: AgreementStudent[];
+  family?: Family;
+}
+
+export interface AgreementStudent {
+  id: number;
+  agreement_id: number;
+  student_id: number;
+  student_name?: string;
+  level: string;
+  base_tuition: number;
+  extras: number;
+  discount_percentage: number;
+  discount_amount: number;
+  amount_to_pay: number;
+}
+
+export interface Comment {
+  id: number;
+  agreement_id: number;
+  user_id: number;
+  user_name: string;
+  content: string;
+  created_at: string;
+}
+
+export interface BudgetSummary {
+  total_budget: number;
+  total_granted: number;
+  granted_assigned: number;
+  granted_in_definition: number;
+  available: number;
+  assigned_percentage: number;
+  in_definition_percentage: number;
+  available_percentage: number;
+  total_families: number;
+  families_assigned: number;
+  families_in_definition: number;
+  families_pending: number;
+}

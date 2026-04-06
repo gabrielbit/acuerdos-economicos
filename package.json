@@ -1,0 +1,5 @@
+{
+  "name": "acuerdos-economicos",
+  "private": true,
+  "workspaces": ["api", "web"]
+}

@@ -25,6 +25,7 @@
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
+    "@vercel/node": "^5.7.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

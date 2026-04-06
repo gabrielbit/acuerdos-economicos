@@ -84,17 +84,19 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
       await client.query('BEGIN');
 
       // Crear acuerdo
+      const initialStatus = data.status ?? 'asignado';
       const agreementResult = await client.query(
-        `INSERT INTO agreements (family_id, period_id, status, discount_percentage, observations, approved_by)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO agreements (family_id, period_id, status, discount_percentage, observations, approved_by, status_changed_at, granted_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
          RETURNING *`,
         [
           data.family_id,
           data.period_id,
-          data.status ?? 'asignado',
+          initialStatus,
           data.discount_percentage,
           data.observations,
           request.user.userId,
+          initialStatus === 'asignado' ? new Date() : null,
         ]
       );
       const agreement = agreementResult.rows[0];
@@ -173,12 +175,17 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
       const old = oldResult.rows[0];
 
       // Actualizar acuerdo
+      const newStatus = data.status ?? old.status;
+      const statusChanged = data.status && data.status !== old.status;
+      const grantedClause = statusChanged && newStatus === 'asignado' ? ', granted_at = NOW()' : '';
+      const statusTimeClause = statusChanged ? ', status_changed_at = NOW()' : '';
+
       const result = await client.query(
         `UPDATE agreements SET
           discount_percentage = COALESCE($1, discount_percentage),
           observations = COALESCE($2, observations),
           status = COALESCE($3, status),
-          updated_at = NOW()
+          updated_at = NOW()${statusTimeClause}${grantedClause}
         WHERE id = $4 RETURNING *`,
         [data.discount_percentage, data.observations, data.status, id]
       );
@@ -244,8 +251,9 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
       return reply.status(404).send({ error: 'Acuerdo no encontrado' });
     }
 
+    const grantedClause = status === 'asignado' ? ', granted_at = NOW()' : '';
     const result = await fastify.db.query(
-      'UPDATE agreements SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      `UPDATE agreements SET status = $1, status_changed_at = NOW(), updated_at = NOW()${grantedClause} WHERE id = $2 RETURNING *`,
       [status, id]
     );
 

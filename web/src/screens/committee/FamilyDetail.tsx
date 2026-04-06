@@ -428,10 +428,24 @@ export default function FamilyDetail() {
           ) : (
             <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin detalle por estudiante</p>
           )}
-          {!editing && agreement.observations && (
-            <div className="px-4 py-3 border-t border-gray-100">
-              <p className="text-xs text-gray-500 mb-1">Observaciones</p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{agreement.observations}</p>
+          {!editing && (agreement.observations || agreement.granted_at || agreement.status_changed_at) && (
+            <div className="px-4 py-3 border-t border-gray-100 space-y-2">
+              {(agreement.granted_at || agreement.status_changed_at) && (
+                <div className="flex gap-6 text-xs text-gray-400">
+                  {agreement.granted_at && (
+                    <span>Otorgado el {new Date(agreement.granted_at).toLocaleDateString('es-AR')}</span>
+                  )}
+                  {agreement.status_changed_at && (
+                    <span>Último cambio de estado: {new Date(agreement.status_changed_at).toLocaleDateString('es-AR')}</span>
+                  )}
+                </div>
+              )}
+              {agreement.observations && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Observaciones</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{agreement.observations}</p>
+                </div>
+              )}
             </div>
           )}
         </div>

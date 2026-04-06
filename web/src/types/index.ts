@@ -59,6 +59,8 @@ export interface Agreement {
   approved_by: number | null;
   created_at: string;
   updated_at: string;
+  granted_at: string | null;
+  status_changed_at: string | null;
   students?: AgreementStudent[];
   family?: Family;
 }

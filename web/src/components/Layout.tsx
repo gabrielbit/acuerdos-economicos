@@ -7,6 +7,7 @@ export default function Layout() {
   const navItems = [
     { to: '/', label: 'Dashboard' },
     { to: '/familias', label: 'Familias' },
+    { to: '/solicitudes', label: 'Solicitudes' },
     { to: '/configuracion', label: 'Configuración' },
     ...(can('canManageUsers') ? [{ to: '/usuarios', label: 'Usuarios' }] : []),
   ];

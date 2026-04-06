@@ -115,7 +115,12 @@ export default function RequestForm() {
       });
       navigate('/portal');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar');
+      const msg = err instanceof Error ? err.message : 'Error al guardar';
+      if (msg.includes('Ya se envió')) {
+        navigate('/portal');
+        return;
+      }
+      setError(msg);
     } finally {
       setSaving(false);
     }

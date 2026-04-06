@@ -26,7 +26,7 @@ const requestFormSchema = z.object({
     name: z.string(),
     relationship: z.string(),
     occupation: z.string().optional(),
-    age: z.number().optional(),
+    age: z.coerce.number().optional(),
   })).optional(),
   // Hijos (incluye los de otras escuelas)
   children: z.array(z.object({

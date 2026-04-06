@@ -1,20 +1,36 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import awsLambdaFastify from '@fastify/aws-lambda';
 import { buildApp } from '../src/app.js';
+import type { FastifyInstance } from 'fastify';
 
-let proxy: ReturnType<typeof awsLambdaFastify> | null = null;
+let app: FastifyInstance | null = null;
 
-async function getProxy() {
-  if (!proxy) {
-    const app = await buildApp();
+async function getApp() {
+  if (!app) {
+    app = await buildApp();
     await app.ready();
-    proxy = awsLambdaFastify(app);
   }
-  return proxy;
+  return app;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const p = await getProxy();
-  // @ts-expect-error Vercel req/res son compatibles con Lambda
-  return p({ ...req, requestContext: {} }, res);
+  try {
+    const fastify = await getApp();
+
+    // Adaptar req/res de Vercel a Fastify
+    const response = await fastify.inject({
+      method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
+      url: req.url ?? '/',
+      headers: req.headers as Record<string, string>,
+      payload: req.body ? JSON.stringify(req.body) : undefined,
+    });
+
+    res.status(response.statusCode);
+    for (const [key, value] of Object.entries(response.headers)) {
+      if (value) res.setHeader(key, value as string);
+    }
+    res.end(response.body);
+  } catch (err) {
+    console.error('Handler error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 }

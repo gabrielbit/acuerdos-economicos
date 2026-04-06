@@ -466,28 +466,28 @@ export default function FamilyDetail() {
             </h2>
           </div>
 
-          {can('canComment') && (
-          <div className="p-4 border-b border-gray-100">
-            <div className="flex gap-3">
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Agregar un comentario..."
-                rows={2}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
-              />
-              <button
-                onClick={handleAddComment}
-                disabled={!newComment.trim() || sendingComment}
-                className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-              >
-                {sendingComment ? '...' : 'Enviar'}
-              </button>
+          {can('canComment') ? (
+            <div className="p-4 border-b border-gray-100">
+              <div className="flex gap-3">
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Agregar un comentario..."
+                  rows={2}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                />
+                <button
+                  onClick={handleAddComment}
+                  disabled={!newComment.trim() || sendingComment}
+                  className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                >
+                  {sendingComment ? '...' : 'Enviar'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Enter para enviar, Shift+Enter para nueva línea</p>
             </div>
-            <p className="text-xs text-gray-400 mt-1">Enter para enviar, Shift+Enter para nueva línea</p>
-          </div>
-          )}
+          ) : null}
 
           {comments.length === 0 ? (
             <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin comentarios aún</p>

@@ -9,6 +9,9 @@ import budgetRoutes from './routes/budget.js';
 import periodRoutes from './routes/periods.js';
 import commentRoutes from './routes/comments.js';
 import userRoutes from './routes/users.js';
+import invitationRoutes from './routes/invitations.js';
+import portalRoutes from './routes/portal.js';
+import requestRoutes from './routes/requests.js';
 
 export async function buildApp() {
   const fastify = Fastify({
@@ -34,6 +37,9 @@ export async function buildApp() {
   await fastify.register(periodRoutes);
   await fastify.register(commentRoutes);
   await fastify.register(userRoutes);
+  await fastify.register(invitationRoutes);
+  await fastify.register(portalRoutes);
+  await fastify.register(requestRoutes);
 
   fastify.get('/api/health', async () => ({ status: 'ok' }));
 

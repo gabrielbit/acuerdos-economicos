@@ -42,10 +42,10 @@ export default async function authRoutes(fastify: FastifyInstance) {
     let familyId: number | null = null;
     if (user.role === 'family') {
       const familyResult = await fastify.db.query(
-        'SELECT id FROM families WHERE user_id = $1',
+        'SELECT family_id FROM family_users WHERE user_id = $1 LIMIT 1',
         [user.id]
       );
-      familyId = familyResult.rows[0]?.id ?? null;
+      familyId = familyResult.rows[0]?.family_id ?? null;
     }
 
     const permissions = buildPermissions(user);

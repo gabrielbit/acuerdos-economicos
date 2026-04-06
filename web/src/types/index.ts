@@ -96,6 +96,29 @@ export interface Comment {
   created_at: string;
 }
 
+export interface AidRequest {
+  id: number;
+  family_id: number;
+  period_id: number;
+  status: 'borrador' | 'enviada' | 'en_revision' | 'resuelta';
+  requested_discount: number | null;
+  is_renewal: boolean;
+  reason: string | null;
+  housing_type: string | null;
+  housing_surface: string | null;
+  housing_rooms: number | null;
+  housing_bedrooms: number | null;
+  additional_info: Record<string, unknown> | null;
+  form_snapshot: Record<string, unknown> | null;
+  submitted_by: number | null;
+  submitted_by_name?: string;
+  submitted_at: string | null;
+  family_name?: string;
+  period_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BudgetSummary {
   total_budget: number;
   total_granted: number;

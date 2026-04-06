@@ -59,6 +59,10 @@ export default function FamilyDetail() {
   const [editObs, setEditObs] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Invitación
+  const [invitationLink, setInvitationLink] = useState('');
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+
   // Edición de familia
   const [editingFamily, setEditingFamily] = useState(false);
   const [editName, setEditName] = useState('');
@@ -92,6 +96,22 @@ export default function FamilyDetail() {
   useEffect(() => {
     loadData().finally(() => setLoading(false));
   }, [id]);
+
+  const generateInvitation = async () => {
+    if (!family) return;
+    setGeneratingInvite(true);
+    try {
+      const inv = await api.createInvitation(family.id) as { token: string };
+      const baseUrl = window.location.origin;
+      setInvitationLink(`${baseUrl}/invitacion/${inv.token}`);
+    } finally {
+      setGeneratingInvite(false);
+    }
+  };
+
+  const copyInvitationLink = () => {
+    navigator.clipboard.writeText(invitationLink);
+  };
 
   const startEditing = () => {
     if (!agreement) return;
@@ -279,6 +299,33 @@ export default function FamilyDetail() {
           </>
         )}
       </div>
+
+      {/* Invitación */}
+      {can('canManageFamilies') && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-900">Link de invitación</span>
+            {invitationLink ? (
+              <>
+                <input readOnly value={invitationLink}
+                  className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600" />
+                <button onClick={copyInvitationLink}
+                  className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 transition-colors">
+                  Copiar
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm text-gray-400">Generá un link para que la familia se registre</span>
+                <button onClick={generateInvitation} disabled={generatingInvite}
+                  className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                  {generatingInvite ? 'Generando...' : 'Generar link'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tabla de hijos */}
       <div className="bg-white rounded-xl border border-gray-200">

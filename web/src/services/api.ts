@@ -118,4 +118,32 @@ export const api = {
 
   deleteUser: (id: number) =>
     request<{ ok: boolean }>(`/users/${id}`, { method: 'DELETE' }),
+
+  // Invitaciones
+  createInvitation: (familyId: number) =>
+    request<Record<string, unknown>>(`/families/${familyId}/invitation`, { method: 'POST', body: '{}' }),
+
+  getInvitation: (familyId: number) =>
+    request<Record<string, unknown> | null>(`/families/${familyId}/invitation`),
+
+  validateInvitation: (token: string) =>
+    request<{ family_name: string; family_id: number; valid: boolean }>(`/invitations/${token}`),
+
+  registerFromInvitation: (token: string, data: { name: string; email: string; password: string }) =>
+    request<{ token: string; user: import('../types').User }>(`/invitations/${token}/register`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Portal familia
+  getPortalFamily: () => request<import('../types').Family & { students: import('../types').Student[] }>('/portal/family'),
+  getPortalAgreements: () => request<import('../types').Agreement[]>('/portal/agreements'),
+  getPortalRequest: () => request<import('../types').AidRequest | null>('/portal/request'),
+  submitPortalRequest: (data: Record<string, unknown>) =>
+    request<import('../types').AidRequest>('/portal/request', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Solicitudes (comisión)
+  getRequests: () => request<import('../types').AidRequest[]>('/requests'),
+  getRequest: (id: number) => request<import('../types').AidRequest>(`/requests/${id}`),
+  deleteRequest: (id: number) => request<{ ok: boolean }>(`/requests/${id}`, { method: 'DELETE' }),
 };

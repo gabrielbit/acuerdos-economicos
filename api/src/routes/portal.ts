@@ -146,6 +146,7 @@ export default async function portalRoutes(fastify: FastifyInstance) {
       [familyId, periodId]
     );
 
+    const housingType = data.housing_type || null;
     const isSubmitting = data.status === 'enviada';
     const formSnapshot = isSubmitting ? data : null;
 
@@ -154,7 +155,7 @@ export default async function portalRoutes(fastify: FastifyInstance) {
       const result = await fastify.db.query(
         `UPDATE aid_requests SET
           requested_discount = $1, is_renewal = $2, reason = $3,
-          housing_type = $4, housing_surface = $5, housing_rooms = $6, housing_bedrooms = $7,
+          housing_type = $4::housing_type, housing_surface = $5, housing_rooms = $6, housing_bedrooms = $7,
           status = $8, additional_info = $9,
           submitted_by = $10, submitted_at = $11,
           form_snapshot = COALESCE($12, form_snapshot),
@@ -162,7 +163,7 @@ export default async function portalRoutes(fastify: FastifyInstance) {
         WHERE id = $13 RETURNING *`,
         [
           data.requested_discount, data.is_renewal, data.reason,
-          data.housing_type, data.housing_surface, data.housing_rooms, data.housing_bedrooms,
+          housingType, data.housing_surface, data.housing_rooms, data.housing_bedrooms,
           data.status,
           JSON.stringify({ family_members: data.family_members, children: data.children }),
           isSubmitting ? request.user.userId : null,

@@ -14,7 +14,7 @@
     "@fastify/aws-lambda": "^6.4.0",
     "@fastify/cors": "^11.0.0",
     "@fastify/jwt": "^9.0.0",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "fastify": "^5.2.0",
     "fastify-plugin": "^5.0.0",
     "pg": "^8.13.0",
@@ -22,7 +22,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
     "@vercel/node": "^5.7.0",

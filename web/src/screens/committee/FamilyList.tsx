@@ -132,21 +132,24 @@ export default function FamilyList() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-4 border-b border-gray-100 flex items-center gap-3">
-          <input
-            type="text"
-            placeholder="Buscar familia..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-          />
-          <div className="flex items-center gap-1.5">
+        <div className="p-4 border-b border-gray-100 space-y-3">
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Buscar familia..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            />
+            <span className="ml-auto text-xs text-gray-400">{filtered.length} familias</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => {
                 const allKeys = Object.keys(STATUS_LABELS);
                 setStatusFilter((prev) => prev.size === allKeys.length ? new Set() : new Set(allKeys));
               }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+              className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
                 statusFilter.size === Object.keys(STATUS_LABELS).length
                   ? 'bg-gray-900 text-white border-gray-900'
                   : statusFilter.size === 0
@@ -172,7 +175,7 @@ export default function FamilyList() {
                       return next;
                     });
                   }}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
                     active
                       ? `${className} border-current`
                       : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
@@ -183,7 +186,6 @@ export default function FamilyList() {
               );
             })}
           </div>
-          <span className="ml-auto text-xs text-gray-400">{filtered.length} familias</span>
         </div>
         <table className="w-full">
           <thead>

@@ -54,13 +54,13 @@ export default function RequestDetail() {
           </div>
           <div>
             <span className="text-gray-500">Período</span>
-            <p className="text-gray-900">{request.period_name}</p>
+            <p className="text-gray-900">{request.period_name ?? '—'}</p>
           </div>
         </div>
       </div>
 
       {/* Contacto */}
-      {info?.address && (
+      {info?.address ? (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-sm font-medium text-gray-900 mb-3">Datos de contacto</h2>
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -70,7 +70,7 @@ export default function RequestDetail() {
             <div><span className="text-gray-500">Teléfono</span><p className="text-gray-900">{info.family_phone ? String(info.family_phone) : '—'}</p></div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Adultos */}
       {members.length > 0 && (

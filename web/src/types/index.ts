@@ -132,6 +132,41 @@ export interface AidRequest {
   updated_at: string;
 }
 
+export interface FeeScheduleRate {
+  id?: number;
+  level: string;
+  tuition_amount: number;
+  extras_amount: number;
+}
+
+export interface FeeSchedule {
+  id: number;
+  name: string;
+  effective_from: string;
+  total_budget: number;
+  created_at: string;
+  rates: FeeScheduleRate[];
+}
+
+export interface MonthlySavingsStudent {
+  student_id: number;
+  student_name: string;
+  level: string;
+  tuition_amount: number;
+  extras_amount: number;
+  discount_percentage: number;
+  savings: number;
+  to_pay: number;
+}
+
+export interface MonthlySavingsEntry {
+  month: string;
+  schedule_name: string;
+  students: MonthlySavingsStudent[];
+  total_savings: number;
+  total_to_pay: number;
+}
+
 export interface BudgetSummary {
   total_budget: number;
   total_granted: number;

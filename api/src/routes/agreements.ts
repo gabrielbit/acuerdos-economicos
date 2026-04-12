@@ -102,10 +102,19 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
         'SELECT * FROM students WHERE family_id = $1', [data.family_id]
       );
 
-      const ratesResult = await client.query(
-        'SELECT * FROM tuition_rates WHERE period_id = $1', [data.period_id]
+      // Obtener rates del tarifario vigente
+      const ratesResult = await client.query(`
+        SELECT fsr.* FROM fee_schedule_rates fsr
+        JOIN fee_schedules fs ON fs.id = fsr.fee_schedule_id
+        WHERE fs.effective_from <= CURRENT_DATE
+        ORDER BY fs.effective_from DESC
+      `);
+      // Filtrar solo las rates del tarifario más reciente
+      const activeScheduleId = ratesResult.rows[0]?.fee_schedule_id;
+      const activeRates = ratesResult.rows.filter(
+        (r: { fee_schedule_id: number }) => r.fee_schedule_id === activeScheduleId
       );
-      const ratesByLevel = new Map(ratesResult.rows.map((r: { level: string }) => [r.level, r]));
+      const ratesByLevel = new Map(activeRates.map((r: { level: string }) => [r.level, r]));
 
       // Crear detalle por estudiante
       for (const student of studentsResult.rows) {
@@ -180,10 +189,18 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
 
       // Si cambió el descuento, recalcular montos por estudiante
       if (data.discount_percentage !== undefined && data.discount_percentage !== Number(old.discount_percentage)) {
-        const ratesResult = await client.query(
-          'SELECT * FROM tuition_rates WHERE period_id = $1', [old.period_id]
+        // Obtener rates del tarifario vigente
+        const ratesResult = await client.query(`
+          SELECT fsr.* FROM fee_schedule_rates fsr
+          JOIN fee_schedules fs ON fs.id = fsr.fee_schedule_id
+          WHERE fs.effective_from <= CURRENT_DATE
+          ORDER BY fs.effective_from DESC
+        `);
+        const activeScheduleId = ratesResult.rows[0]?.fee_schedule_id;
+        const activeRates = ratesResult.rows.filter(
+          (r: { fee_schedule_id: number }) => r.fee_schedule_id === activeScheduleId
         );
-        const ratesByLevel = new Map(ratesResult.rows.map((r: { level: string }) => [r.level, r]));
+        const ratesByLevel = new Map(activeRates.map((r: { level: string }) => [r.level, r]));
 
         const studentsResult = await client.query(
           'SELECT ast.*, s.level as student_level FROM agreement_students ast JOIN students s ON s.id = ast.student_id WHERE ast.agreement_id = $1',

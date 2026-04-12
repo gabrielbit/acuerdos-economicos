@@ -152,6 +152,27 @@ export const api = {
   submitPortalRequest: (data: Record<string, unknown>) =>
     request<import('../types').AidRequest>('/portal/request', { method: 'POST', body: JSON.stringify(data) }),
 
+  // Tarifarios
+  getFeeSchedules: () =>
+    request<import('../types').FeeSchedule[]>('/fee-schedules'),
+
+  getActiveFeeSchedule: () =>
+    request<import('../types').FeeSchedule>('/fee-schedules/active'),
+
+  createFeeSchedule: (data: {
+    name: string;
+    effective_from: string;
+    total_budget: number;
+    rates: Array<{ level: string; tuition_amount: number; extras_amount: number }>;
+  }) =>
+    request<import('../types').FeeSchedule>('/fee-schedules', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Ahorro mensual
+  getMonthlySavings: (familyId: number, from?: string, to?: string) =>
+    request<import('../types').MonthlySavingsEntry[]>(
+      `/families/${familyId}/monthly-savings${from && to ? `?from=${from}&to=${to}` : ''}`
+    ),
+
   // Solicitudes (comisión)
   getRequests: () => request<import('../types').AidRequest[]>('/requests'),
   getRequest: (id: number) => request<import('../types').AidRequest>(`/requests/${id}`),

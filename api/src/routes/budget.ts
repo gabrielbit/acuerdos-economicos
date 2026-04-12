@@ -8,9 +8,16 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
 
     const result = await fastify.db.query(`
       WITH active_period AS (
-        SELECT id, total_budget
-        FROM aid_periods
+        SELECT id FROM aid_periods
         WHERE id = COALESCE($1::int, (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1))
+      ),
+      active_budget AS (
+        SELECT COALESCE(
+          (SELECT total_budget FROM fee_schedules
+           WHERE effective_from <= CURRENT_DATE
+           ORDER BY effective_from DESC LIMIT 1),
+          0
+        ) AS total_budget
       ),
       agreement_totals AS (
         SELECT
@@ -26,28 +33,28 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
         LEFT JOIN agreement_students ast ON ast.agreement_id = a.id
       )
       SELECT
-        ap.total_budget,
+        ab.total_budget,
         (at.granted_assigned + at.granted_in_definition) AS total_granted,
         at.granted_assigned,
         at.granted_in_definition,
-        (ap.total_budget - at.granted_assigned - at.granted_in_definition) AS available,
-        CASE WHEN ap.total_budget > 0
-          THEN (at.granted_assigned / ap.total_budget * 100)
+        (ab.total_budget - at.granted_assigned - at.granted_in_definition) AS available,
+        CASE WHEN ab.total_budget > 0
+          THEN (at.granted_assigned / ab.total_budget * 100)
           ELSE 0
         END AS assigned_percentage,
-        CASE WHEN ap.total_budget > 0
-          THEN (at.granted_in_definition / ap.total_budget * 100)
+        CASE WHEN ab.total_budget > 0
+          THEN (at.granted_in_definition / ab.total_budget * 100)
           ELSE 0
         END AS in_definition_percentage,
-        CASE WHEN ap.total_budget > 0
-          THEN ((ap.total_budget - at.granted_assigned - at.granted_in_definition) / ap.total_budget * 100)
+        CASE WHEN ab.total_budget > 0
+          THEN ((ab.total_budget - at.granted_assigned - at.granted_in_definition) / ab.total_budget * 100)
           ELSE 0
         END AS available_percentage,
         at.total_families,
         at.families_assigned,
         at.families_in_definition,
         at.families_pending
-      FROM active_period ap
+      FROM active_budget ab
       CROSS JOIN agreement_totals at
     `, [period_id ?? null]);
 

@@ -190,6 +190,115 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     return result.rows;
   });
 
+  // Ahorro mensual histórico de una familia
+  fastify.get('/api/families/:id/monthly-savings', {
+    preHandler: [fastify.requireCommittee],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { from, to, period_id } = request.query as {
+      from?: string; to?: string; period_id?: string;
+    };
+
+    // Determinar rango de meses: por defecto, el período activo
+    let fromDate: string;
+    let toDate: string;
+
+    if (from && to) {
+      fromDate = `${from}-01`;
+      toDate = `${to}-01`;
+    } else {
+      const periodResult = await fastify.db.query(`
+        SELECT start_month, end_month, year FROM aid_periods
+        WHERE id = COALESCE($1::int, (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1))
+      `, [period_id ?? null]);
+
+      if (periodResult.rows.length === 0) {
+        return reply.status(404).send({ error: 'No hay período activo' });
+      }
+      const p = periodResult.rows[0];
+      fromDate = `${p.year}-${String(p.start_month).padStart(2, '0')}-01`;
+      toDate = `${p.year}-${String(p.end_month).padStart(2, '0')}-01`;
+    }
+
+    const result = await fastify.db.query(`
+      WITH months AS (
+        SELECT generate_series($2::date, $3::date, '1 month')::date AS month_start
+      ),
+      month_schedules AS (
+        SELECT DISTINCT ON (m.month_start)
+          m.month_start, fs.id AS schedule_id, fs.name AS schedule_name
+        FROM months m
+        JOIN fee_schedules fs ON fs.effective_from <= m.month_start
+        ORDER BY m.month_start, fs.effective_from DESC
+      )
+      SELECT
+        ms.month_start,
+        ms.schedule_name,
+        s.id AS student_id,
+        s.name AS student_name,
+        s.level,
+        fsr.tuition_amount,
+        fsr.extras_amount,
+        a.discount_percentage,
+        ROUND(fsr.tuition_amount * a.discount_percentage / 100, 2) AS savings,
+        ROUND(fsr.tuition_amount - fsr.tuition_amount * a.discount_percentage / 100 + fsr.extras_amount, 2) AS to_pay
+      FROM month_schedules ms
+      JOIN agreements a ON a.family_id = $1::int
+        AND a.period_id = COALESCE($4::int, (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1))
+      JOIN students s ON s.family_id = $1::int
+      JOIN fee_schedule_rates fsr ON fsr.fee_schedule_id = ms.schedule_id AND fsr.level = s.level
+      ORDER BY ms.month_start, s.name
+    `, [id, fromDate, toDate, period_id ?? null]);
+
+    // Agrupar por mes
+    const monthsMap = new Map<string, {
+      month: string;
+      schedule_name: string;
+      students: Array<{
+        student_id: number;
+        student_name: string;
+        level: string;
+        tuition_amount: number;
+        extras_amount: number;
+        discount_percentage: number;
+        savings: number;
+        to_pay: number;
+      }>;
+      total_savings: number;
+      total_to_pay: number;
+    }>();
+
+    for (const row of result.rows) {
+      const key = row.month_start.toISOString().slice(0, 7);
+      if (!monthsMap.has(key)) {
+        monthsMap.set(key, {
+          month: key,
+          schedule_name: row.schedule_name,
+          students: [],
+          total_savings: 0,
+          total_to_pay: 0,
+        });
+      }
+      const entry = monthsMap.get(key)!;
+      const savings = Number(row.savings);
+      const toPay = Number(row.to_pay);
+      entry.students.push({
+        student_id: row.student_id,
+        student_name: row.student_name,
+        level: row.level,
+        tuition_amount: Number(row.tuition_amount),
+        extras_amount: Number(row.extras_amount),
+        discount_percentage: Number(row.discount_percentage),
+        savings,
+        to_pay: toPay,
+      });
+      entry.total_savings += savings;
+      entry.total_to_pay += toPay;
+    }
+
+    return Array.from(monthsMap.values());
+  });
+
   // Crear estudiante
   fastify.post('/api/families/:id/students', {
     preHandler: [fastify.requirePermission('canManageFamilies')],

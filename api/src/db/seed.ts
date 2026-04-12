@@ -134,6 +134,38 @@ async function seed() {
     `, [f4Id, periodId]);
   }
 
+  // Fee schedules (tarifarios con fecha de vigencia)
+  await pool.query(`
+    INSERT INTO fee_schedules (name, effective_from, total_budget) VALUES
+      ('Tarifario Marzo 2026', '2026-03-01', 14426670),
+      ('Tarifario Abril 2026', '2026-04-01', 18358030.80)
+    ON CONFLICT (effective_from) DO NOTHING
+  `);
+
+  const fs1 = await pool.query(`SELECT id FROM fee_schedules WHERE effective_from = '2026-03-01'`);
+  if (fs1.rows[0]) {
+    await pool.query(`
+      INSERT INTO fee_schedule_rates (fee_schedule_id, level, tuition_amount, extras_amount) VALUES
+        ($1, 'jardin', 650000, 0),
+        ($1, 'primaria', 822000, 28000),
+        ($1, 'secundaria', 858000, 37000),
+        ($1, '12vo', 1073000, 37000)
+      ON CONFLICT DO NOTHING
+    `, [fs1.rows[0].id]);
+  }
+
+  const fs2 = await pool.query(`SELECT id FROM fee_schedules WHERE effective_from = '2026-04-01'`);
+  if (fs2.rows[0]) {
+    await pool.query(`
+      INSERT INTO fee_schedule_rates (fee_schedule_id, level, tuition_amount, extras_amount) VALUES
+        ($1, 'jardin', 702000, 0),
+        ($1, 'primaria', 887700, 30300),
+        ($1, 'secundaria', 927000, 40000),
+        ($1, '12vo', 1112000, 40000)
+      ON CONFLICT DO NOTHING
+    `, [fs2.rows[0].id]);
+  }
+
   await pool.end();
   console.log('Seed completo.');
 }

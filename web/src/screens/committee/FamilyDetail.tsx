@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
-import type { Family, Student, Agreement, AgreementStudent, Comment } from '../../types';
+import type { Family, Student, Agreement, AgreementStudent, Comment, MonthlySavingsEntry } from '../../types';
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('es-AR', {
@@ -57,6 +57,11 @@ export default function FamilyDetail() {
   const [sendingComment, setSendingComment] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Ahorro mensual
+  const [monthlySavings, setMonthlySavings] = useState<MonthlySavingsEntry[]>([]);
+  const [showMonthlySavings, setShowMonthlySavings] = useState(false);
+  const [loadingSavings, setLoadingSavings] = useState(false);
+
   // Edición de acuerdo
   const [editing, setEditing] = useState(false);
   const [editDiscount, setEditDiscount] = useState(0);
@@ -110,6 +115,26 @@ export default function FamilyDetail() {
   useEffect(() => {
     loadData().finally(() => setLoading(false));
   }, [id]);
+
+  const loadMonthlySavings = async () => {
+    if (!id || loadingSavings) return;
+    setLoadingSavings(true);
+    try {
+      const data = await api.getMonthlySavings(Number(id));
+      setMonthlySavings(data);
+      setShowMonthlySavings(true);
+    } catch {
+      setMonthlySavings([]);
+    } finally {
+      setLoadingSavings(false);
+    }
+  };
+
+  const MONTH_NAMES: Record<string, string> = {
+    '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril',
+    '05': 'Mayo', '06': 'Junio', '07': 'Julio', '08': 'Agosto',
+    '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre',
+  };
 
   const parseInterviewInput = (val: string): Date | null => {
     const parts = val.match(/^(\S+)\s+(\d{1,2}):(\d{2})$/);
@@ -731,6 +756,90 @@ export default function FamilyDetail() {
                 </div>
               )}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Ahorro mensual */}
+      {agreement && (
+        <div className="bg-white rounded-xl border border-gray-200">
+          <button
+            onClick={() => showMonthlySavings ? setShowMonthlySavings(false) : loadMonthlySavings()}
+            className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors rounded-xl"
+          >
+            <h2 className="text-sm font-medium text-gray-900">Ahorro mensual</h2>
+            <span className="text-xs text-gray-400">
+              {loadingSavings ? 'Cargando...' : showMonthlySavings ? 'Ocultar' : 'Ver detalle'}
+            </span>
+          </button>
+
+          {showMonthlySavings && monthlySavings.length > 0 && (
+            <>
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 border-t border-b border-gray-100">
+                    <th className="px-4 py-3 font-medium">Mes</th>
+                    <th className="px-4 py-3 font-medium">Tarifario</th>
+                    <th className="px-4 py-3 font-medium text-right">Ahorro</th>
+                    <th className="px-4 py-3 font-medium text-right">A pagar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlySavings.map((entry) => (
+                    <tr key={entry.month} className="border-b border-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {MONTH_NAMES[entry.month.slice(5)] ?? entry.month} {entry.month.slice(0, 4)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{entry.schedule_name}</td>
+                      <td className="px-4 py-3 text-sm text-green-600 text-right font-medium">
+                        {formatMoney(entry.total_savings)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                        {formatMoney(entry.total_to_pay)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-gray-200 bg-gray-50">
+                    <td colSpan={2} className="px-4 py-3 text-sm font-medium text-gray-900">
+                      Total período
+                    </td>
+                    <td className="px-4 py-3 text-sm text-green-700 text-right font-semibold">
+                      {formatMoney(monthlySavings.reduce((sum, e) => sum + e.total_savings, 0))}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right font-semibold">
+                      {formatMoney(monthlySavings.reduce((sum, e) => sum + e.total_to_pay, 0))}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              {/* Detalle por estudiante del primer mes como referencia */}
+              {monthlySavings[0]?.students.length > 1 && (
+                <div className="p-4 border-t border-gray-100">
+                  <p className="text-xs text-gray-400 mb-2">Desglose por hijo (mes actual)</p>
+                  <div className="space-y-1">
+                    {monthlySavings[monthlySavings.length - 1].students.map((s) => (
+                      <div key={s.student_id} className="flex justify-between text-xs text-gray-600">
+                        <span>{s.student_name} ({LEVEL_LABELS[s.level] ?? s.level})</span>
+                        <span>
+                          Cuota {formatMoney(s.tuition_amount)}
+                          {s.extras_amount > 0 ? ` + ${formatMoney(s.extras_amount)} extras` : ''}
+                          {' — '}ahorro {formatMoney(s.savings)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {showMonthlySavings && monthlySavings.length === 0 && !loadingSavings && (
+            <p className="px-4 py-6 text-sm text-gray-400 text-center border-t border-gray-100">
+              No hay datos de ahorro mensual disponibles
+            </p>
           )}
         </div>
       )}

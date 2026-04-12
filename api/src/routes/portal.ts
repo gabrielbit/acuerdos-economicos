@@ -173,6 +173,14 @@ export default async function portalRoutes(fastify: FastifyInstance) {
         ]
       );
 
+      // Auto-transición: → formulario_completado al enviar
+      if (isSubmitting) {
+        await fastify.db.query(
+          `UPDATE families SET status = 'formulario_completado'::family_status WHERE id = $1 AND status::text IN ('solicitud', 'formulario_enviado')`,
+          [familyId]
+        );
+      }
+
       // Actualizar datos de contacto de la familia
       if (data.address || data.locality || data.postal_code || data.phone) {
         await fastify.db.query(
@@ -207,6 +215,14 @@ export default async function portalRoutes(fastify: FastifyInstance) {
         formSnapshot ? JSON.stringify(formSnapshot) : null,
       ]
     );
+
+    // Auto-transición: → formulario_completado al enviar
+    if (isSubmitting) {
+      await fastify.db.query(
+        `UPDATE families SET status = 'formulario_completado'::family_status WHERE id = $1 AND status::text IN ('solicitud', 'formulario_enviado')`,
+        [familyId]
+      );
+    }
 
     // Actualizar datos de contacto
     if (data.address || data.locality || data.postal_code || data.phone) {

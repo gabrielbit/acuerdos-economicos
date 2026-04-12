@@ -14,19 +14,25 @@ function formatMoney(amount: number): string {
 }
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  asignado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
+  solicitud: { label: 'Solicitud', className: 'bg-purple-50 text-purple-700' },
+  formulario_enviado: { label: 'Form. enviado', className: 'bg-violet-50 text-violet-700' },
+  formulario_completado: { label: 'Form. completado', className: 'bg-indigo-50 text-indigo-700' },
+  agendado: { label: 'Agendado', className: 'bg-blue-50 text-blue-700' },
   en_definicion: { label: 'En definición', className: 'bg-amber-50 text-amber-700' },
-  pendiente: { label: 'Pendiente', className: 'bg-purple-50 text-purple-700' },
+  otorgado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
   rechazado: { label: 'Rechazado', className: 'bg-red-50 text-red-700' },
   suspendido: { label: 'Vencido', className: 'bg-gray-100 text-gray-500' },
 };
 
 const STATUS_ORDER: Record<string, number> = {
-  asignado: 0,
-  en_definicion: 1,
-  pendiente: 2,
-  suspendido: 3,
-  rechazado: 4,
+  solicitud: 0,
+  formulario_enviado: 1,
+  formulario_completado: 2,
+  agendado: 3,
+  en_definicion: 4,
+  otorgado: 5,
+  rechazado: 6,
+  suspendido: 7,
 };
 
 type SortKey = 'name' | 'student_count' | 'status' | 'discount' | 'total_discount';
@@ -64,7 +70,9 @@ export default function FamilyList() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(
+    new Set(['solicitud', 'formulario_enviado', 'formulario_completado', 'agendado', 'en_definicion'])
+  );
   const [sortKey, setSortKey] = useState<SortKey>('status');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -86,7 +94,7 @@ export default function FamilyList() {
   const filtered = families
     .filter((f) => {
       const matchesName = !filter || f.name.toLowerCase().includes(filter.toLowerCase());
-      const matchesStatus = !statusFilter || f.agreement_status === statusFilter;
+      const matchesStatus = statusFilter.size === 0 || statusFilter.has(f.status);
       return matchesName && matchesStatus;
     })
     .sort((a, b) => {
@@ -97,8 +105,8 @@ export default function FamilyList() {
         case 'student_count':
           return ((a.student_count ?? 0) - (b.student_count ?? 0)) * dir;
         case 'status': {
-          const sa = STATUS_ORDER[a.agreement_status ?? 'pendiente'] ?? 9;
-          const sb = STATUS_ORDER[b.agreement_status ?? 'pendiente'] ?? 9;
+          const sa = STATUS_ORDER[a.status] ?? 9;
+          const sb = STATUS_ORDER[b.status] ?? 9;
           if (sa !== sb) return (sa - sb) * dir;
           return a.name.localeCompare(b.name);
         }
@@ -132,17 +140,49 @@ export default function FamilyList() {
             onChange={(e) => setFilter(e.target.value)}
             className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
           />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
-          >
-            <option value="">Todos los estados</option>
-            <option value="asignado">Otorgado</option>
-            <option value="en_definicion">En definición</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="suspendido">Vencido</option>
-          </select>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                const allKeys = Object.keys(STATUS_LABELS);
+                setStatusFilter((prev) => prev.size === allKeys.length ? new Set() : new Set(allKeys));
+              }}
+              className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                statusFilter.size === Object.keys(STATUS_LABELS).length
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : statusFilter.size === 0
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              Todos
+            </button>
+            {Object.entries(STATUS_LABELS).map(([key, { label, className }]) => {
+              const active = statusFilter.has(key);
+              return (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setStatusFilter((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(key)) {
+                        next.delete(key);
+                      } else {
+                        next.add(key);
+                      }
+                      return next;
+                    });
+                  }}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                    active
+                      ? `${className} border-current`
+                      : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
           <span className="ml-auto text-xs text-gray-400">{filtered.length} familias</span>
         </div>
         <table className="w-full">
@@ -164,7 +204,7 @@ export default function FamilyList() {
               </tr>
             ) : (
               filtered.map((family) => {
-                const status = STATUS_LABELS[family.agreement_status ?? ''] ?? STATUS_LABELS.pendiente;
+                const status = STATUS_LABELS[family.status] ?? STATUS_LABELS.solicitud;
                 return (
                   <tr key={family.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">

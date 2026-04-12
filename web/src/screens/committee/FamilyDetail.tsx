@@ -35,9 +35,12 @@ const LEVEL_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  asignado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
+  solicitud: { label: 'Solicitud', className: 'bg-purple-50 text-purple-700' },
+  formulario_enviado: { label: 'Form. enviado', className: 'bg-violet-50 text-violet-700' },
+  formulario_completado: { label: 'Form. completado', className: 'bg-indigo-50 text-indigo-700' },
+  agendado: { label: 'Agendado', className: 'bg-blue-50 text-blue-700' },
   en_definicion: { label: 'En definición', className: 'bg-amber-50 text-amber-700' },
-  pendiente: { label: 'Pendiente', className: 'bg-purple-50 text-purple-700' },
+  otorgado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
   rechazado: { label: 'Rechazado', className: 'bg-red-50 text-red-700' },
   suspendido: { label: 'Vencido', className: 'bg-gray-100 text-gray-500' },
 };
@@ -47,8 +50,10 @@ export default function FamilyDetail() {
   const { id } = useParams<{ id: string }>();
   const [family, setFamily] = useState<(Family & { students: Student[] }) | null>(null);
   const [agreement, setAgreement] = useState<Agreement | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState('');
+  const [familyComments, setFamilyComments] = useState<Comment[]>([]);
+  const [agreementComments, setAgreementComments] = useState<Comment[]>([]);
+  const [newFamilyComment, setNewFamilyComment] = useState('');
+  const [newAgreementComment, setNewAgreementComment] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -80,16 +85,21 @@ export default function FamilyDetail() {
 
   const loadData = async () => {
     if (!id) return;
-    const [f, agreements] = await Promise.all([
-      api.getFamily(Number(id)),
+    const familyId = Number(id);
+    const [f, agreements, fc] = await Promise.all([
+      api.getFamily(familyId),
       api.getAgreements(),
+      api.getComments('family', familyId),
     ]);
-    const a = agreements.find((a) => a.family_id === Number(id)) ?? null;
+    const a = agreements.find((a) => a.family_id === familyId) ?? null;
     setFamily(f);
     setAgreement(a);
+    setFamilyComments(fc);
     if (a) {
-      const c = await api.getComments(a.id);
-      setComments(c);
+      const ac = await api.getComments('agreement', a.id);
+      setAgreementComments(ac);
+    } else {
+      setAgreementComments([]);
     }
   };
 
@@ -127,7 +137,6 @@ export default function FamilyDetail() {
     try {
       await api.updateAgreement(agreement.id, {
         discount_percentage: editDiscount,
-        status: editStatus as Agreement['status'],
         observations: editObs || undefined,
       });
       setEditing(false);
@@ -187,29 +196,34 @@ export default function FamilyDetail() {
     }
   };
 
-  const handleAddComment = async () => {
-    if (!newComment.trim() || !agreement) return;
+  const handleAddFamilyComment = async () => {
+    if (!newFamilyComment.trim() || !family) return;
     setSendingComment(true);
     try {
-      const comment = await api.addComment(agreement.id, newComment.trim());
-      setComments((prev) => [comment, ...prev]);
-      setNewComment('');
+      const comment = await api.addComment('family', family.id, newFamilyComment.trim());
+      setFamilyComments((prev) => [comment, ...prev]);
+      setNewFamilyComment('');
     } finally {
       setSendingComment(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleAddComment();
+  const handleAddAgreementComment = async () => {
+    if (!newAgreementComment.trim() || !agreement) return;
+    setSendingComment(true);
+    try {
+      const comment = await api.addComment('agreement', agreement.id, newAgreementComment.trim());
+      setAgreementComments((prev) => [comment, ...prev]);
+      setNewAgreementComment('');
+    } finally {
+      setSendingComment(false);
     }
   };
 
   if (loading) return <p className="text-sm text-gray-500 py-8 text-center">Cargando...</p>;
   if (!family) return <p className="text-sm text-gray-500 py-8 text-center">Familia no encontrada.</p>;
 
-  const status = STATUS_LABELS[agreement?.status ?? 'pendiente'];
+  const status = STATUS_LABELS[family.status] ?? STATUS_LABELS.solicitud;
 
   return (
     <div className="space-y-6">
@@ -264,7 +278,28 @@ export default function FamilyDetail() {
                 )}
               </div>
               <div className="flex items-center gap-3">
-                {agreement && (
+                {can('canChangeStatus') ? (
+                  <select
+                    value={family.status}
+                    onChange={async (e) => {
+                      await api.updateFamilyStatus(family.id, e.target.value);
+                      setLoading(true);
+                      await loadData();
+                      setLoading(false);
+                    }}
+                    className={`px-3 py-1 text-sm font-medium rounded-full border-0 cursor-pointer appearance-none pr-6 ${status.className}`}
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
+                  >
+                    <option value="solicitud">Solicitud</option>
+                    <option value="formulario_enviado">Form. enviado</option>
+                    <option value="formulario_completado">Form. completado</option>
+                    <option value="agendado">Agendado</option>
+                    <option value="en_definicion">En definición</option>
+                    <option value="otorgado">Otorgado</option>
+                    <option value="rechazado">Rechazado</option>
+                    <option value="suspendido">Vencido</option>
+                  </select>
+                ) : (
                   <span className={`px-3 py-1 text-sm font-medium rounded-full ${status.className}`}>
                     {status.label}
                   </span>
@@ -406,7 +441,7 @@ export default function FamilyDetail() {
                     if (!confirm('¿Eliminar este acuerdo? Esta acción no se puede deshacer.')) return;
                     await api.deleteAgreement(agreement.id);
                     setAgreement(null);
-                    setComments([]);
+                    setAgreementComments([]);
                   }}
                     className="text-xs text-red-400 hover:text-red-600">Borrar</button>
                 </>
@@ -422,17 +457,6 @@ export default function FamilyDetail() {
                   <input type="number" min={0} max={100} value={editDiscount}
                     onChange={(e) => setEditDiscount(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Estado</label>
-                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
-                    <option value="asignado">Otorgado</option>
-                    <option value="en_definicion">En definición</option>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="suspendido">Vencido</option>
-                    <option value="rechazado">Rechazado</option>
-                  </select>
                 </div>
                 <div className="flex items-end">
                   <div className="flex gap-2">
@@ -504,43 +528,89 @@ export default function FamilyDetail() {
         </div>
       )}
 
-      {/* Comentarios */}
+      {/* Notas de la familia */}
+      <div className="bg-white rounded-xl border border-gray-200">
+        <div className="p-4 border-b border-gray-100">
+          <h2 className="text-sm font-medium text-gray-900">
+            Notas {familyComments.length > 0 && <span className="text-gray-400 font-normal">({familyComments.length})</span>}
+          </h2>
+        </div>
+
+        {can('canComment') && (
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex gap-3">
+              <textarea
+                value={newFamilyComment}
+                onChange={(e) => setNewFamilyComment(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddFamilyComment(); } }}
+                placeholder="Agregar una nota sobre la familia..."
+                rows={2}
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+              />
+              <button
+                onClick={handleAddFamilyComment}
+                disabled={!newFamilyComment.trim() || sendingComment}
+                className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+              >
+                {sendingComment ? '...' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {familyComments.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin notas aún</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {familyComments.map((c) => (
+              <div key={c.id} className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium text-gray-900">{c.user_name}</span>
+                  <span className="text-xs text-gray-400">{timeAgo(c.created_at)}</span>
+                </div>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.content}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Comentarios del acuerdo */}
       {agreement && (
         <div className="bg-white rounded-xl border border-gray-200">
           <div className="p-4 border-b border-gray-100">
             <h2 className="text-sm font-medium text-gray-900">
-              Comentarios {comments.length > 0 && <span className="text-gray-400 font-normal">({comments.length})</span>}
+              Comentarios del acuerdo {agreementComments.length > 0 && <span className="text-gray-400 font-normal">({agreementComments.length})</span>}
             </h2>
           </div>
 
-          {can('canComment') ? (
+          {can('canComment') && (
             <div className="p-4 border-b border-gray-100">
               <div className="flex gap-3">
                 <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Agregar un comentario..."
+                  value={newAgreementComment}
+                  onChange={(e) => setNewAgreementComment(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddAgreementComment(); } }}
+                  placeholder="Comentario sobre el acuerdo..."
                   rows={2}
                   className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
                 />
                 <button
-                  onClick={handleAddComment}
-                  disabled={!newComment.trim() || sendingComment}
+                  onClick={handleAddAgreementComment}
+                  disabled={!newAgreementComment.trim() || sendingComment}
                   className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
                 >
                   {sendingComment ? '...' : 'Enviar'}
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">Enter para enviar, Shift+Enter para nueva línea</p>
             </div>
-          ) : null}
+          )}
 
-          {comments.length === 0 ? (
+          {agreementComments.length === 0 ? (
             <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin comentarios aún</p>
           ) : (
             <div className="divide-y divide-gray-50">
-              {comments.map((c) => (
+              {agreementComments.map((c) => (
                 <div key={c.id} className="px-4 py-3">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-medium text-gray-900">{c.user_name}</span>

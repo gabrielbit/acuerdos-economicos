@@ -6,7 +6,6 @@ const createAgreementSchema = z.object({
   period_id: z.number().int().positive(),
   discount_percentage: z.number().min(0).max(100),
   observations: z.string().optional(),
-  status: z.enum(['pendiente', 'en_definicion', 'asignado', 'rechazado', 'suspendido']).optional(),
 });
 
 export default async function agreementRoutes(fastify: FastifyInstance) {
@@ -83,20 +82,17 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
     try {
       await client.query('BEGIN');
 
-      // Crear acuerdo
-      const initialStatus = data.status ?? 'asignado';
+      // Crear acuerdo (sin campo status — el status vive en la familia)
       const agreementResult = await client.query(
-        `INSERT INTO agreements (family_id, period_id, status, discount_percentage, observations, approved_by, status_changed_at, granted_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
+        `INSERT INTO agreements (family_id, period_id, discount_percentage, observations, approved_by, granted_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
          RETURNING *`,
         [
           data.family_id,
           data.period_id,
-          initialStatus,
           data.discount_percentage,
           data.observations,
           request.user.userId,
-          initialStatus === 'asignado' ? new Date() : null,
         ]
       );
       const agreement = agreementResult.rows[0];
@@ -155,7 +151,7 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Actualizar acuerdo
+  // Actualizar acuerdo (solo % y observaciones)
   fastify.put('/api/agreements/:id', {
     preHandler: [fastify.requirePermission('canManageAgreements')],
   }, async (request, reply) => {
@@ -166,7 +162,6 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
     try {
       await client.query('BEGIN');
 
-      // Obtener valores anteriores
       const oldResult = await client.query('SELECT * FROM agreements WHERE id = $1', [id]);
       if (oldResult.rows.length === 0) {
         await client.query('ROLLBACK');
@@ -174,20 +169,13 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
       }
       const old = oldResult.rows[0];
 
-      // Actualizar acuerdo
-      const newStatus = data.status ?? old.status;
-      const statusChanged = data.status && data.status !== old.status;
-      const grantedClause = statusChanged && newStatus === 'asignado' ? ', granted_at = NOW()' : '';
-      const statusTimeClause = statusChanged ? ', status_changed_at = NOW()' : '';
-
       const result = await client.query(
         `UPDATE agreements SET
           discount_percentage = COALESCE($1, discount_percentage),
           observations = COALESCE($2, observations),
-          status = COALESCE($3, status),
-          updated_at = NOW()${statusTimeClause}${grantedClause}
-        WHERE id = $4 RETURNING *`,
-        [data.discount_percentage, data.observations, data.status, id]
+          updated_at = NOW()
+        WHERE id = $3 RETURNING *`,
+        [data.discount_percentage, data.observations, id]
       );
 
       // Si cambió el descuento, recalcular montos por estudiante
@@ -238,35 +226,7 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Cambiar estado
-  fastify.patch('/api/agreements/:id/status', {
-    preHandler: [fastify.requirePermission('canChangeStatus')],
-  }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const { status } = z.object({ status: z.enum(['pendiente', 'en_definicion', 'asignado', 'rechazado', 'suspendido']) })
-      .parse(request.body);
-
-    const oldResult = await fastify.db.query('SELECT status FROM agreements WHERE id = $1', [id]);
-    if (oldResult.rows.length === 0) {
-      return reply.status(404).send({ error: 'Acuerdo no encontrado' });
-    }
-
-    const grantedClause = status === 'asignado' ? ', granted_at = NOW()' : '';
-    const result = await fastify.db.query(
-      `UPDATE agreements SET status = $1, status_changed_at = NOW(), updated_at = NOW()${grantedClause} WHERE id = $2 RETURNING *`,
-      [status, id]
-    );
-
-    await fastify.db.query(
-      `INSERT INTO agreement_audit_log (agreement_id, action, old_values, new_values, changed_by)
-       VALUES ($1, 'status_change', $2, $3, $4)`,
-      [id, JSON.stringify({ status: oldResult.rows[0].status }), JSON.stringify({ status }), request.user.userId]
-    );
-
-    return result.rows[0];
-  });
-
-  // Eliminar acuerdo
+  // Eliminar acuerdo — vuelve familia a en_definicion
   fastify.delete('/api/agreements/:id', {
     preHandler: [fastify.requirePermission('canManageAgreements')],
   }, async (request, reply) => {
@@ -278,6 +238,13 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
     }
 
     await fastify.db.query('DELETE FROM agreements WHERE id = $1', [id]);
+
+    // Volver familia a en_definicion
+    await fastify.db.query(
+      `UPDATE families SET status = 'en_definicion'::family_status WHERE id = $1`,
+      [existing.rows[0].family_id]
+    );
+
     return { ok: true };
   });
 }

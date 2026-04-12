@@ -13,9 +13,12 @@ function formatMoney(amount: number): string {
 }
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  asignado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
+  solicitud: { label: 'Solicitud', className: 'bg-purple-50 text-purple-700' },
+  formulario_enviado: { label: 'Form. enviado', className: 'bg-violet-50 text-violet-700' },
+  formulario_completado: { label: 'Form. completado', className: 'bg-indigo-50 text-indigo-700' },
+  agendado: { label: 'Agendado', className: 'bg-blue-50 text-blue-700' },
   en_definicion: { label: 'En definición', className: 'bg-amber-50 text-amber-700' },
-  pendiente: { label: 'Pendiente', className: 'bg-purple-50 text-purple-700' },
+  otorgado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
   rechazado: { label: 'Rechazado', className: 'bg-red-50 text-red-700' },
   suspendido: { label: 'Vencido', className: 'bg-gray-100 text-gray-500' },
 };
@@ -45,22 +48,25 @@ export default function Dashboard() {
   }
 
   const STATUS_ORDER: Record<string, number> = {
-    asignado: 0,
-    en_definicion: 1,
-    pendiente: 2,
-    suspendido: 3,
-    rechazado: 4,
+    solicitud: 0,
+    formulario_enviado: 1,
+    formulario_completado: 2,
+    agendado: 3,
+    en_definicion: 4,
+    otorgado: 5,
+    rechazado: 6,
+    suspendido: 7,
   };
 
   const filteredFamilies = families
     .filter((f) => {
       const matchesName = !filter || f.name.toLowerCase().includes(filter.toLowerCase());
-      const matchesStatus = !statusFilter || f.agreement_status === statusFilter;
+      const matchesStatus = !statusFilter || f.status === statusFilter;
       return matchesName && matchesStatus;
     })
     .sort((a, b) => {
-      const statusA = STATUS_ORDER[a.agreement_status ?? 'pendiente'] ?? 9;
-      const statusB = STATUS_ORDER[b.agreement_status ?? 'pendiente'] ?? 9;
+      const statusA = STATUS_ORDER[a.status] ?? 9;
+      const statusB = STATUS_ORDER[b.status] ?? 9;
       if (statusA !== statusB) return statusA - statusB;
       const discA = Number(a.discount_percentage ?? 0);
       const discB = Number(b.discount_percentage ?? 0);
@@ -166,7 +172,7 @@ export default function Dashboard() {
               </tr>
             ) : (
               filteredFamilies.map((family) => {
-                const status = STATUS_LABELS[family.agreement_status ?? ''] ?? STATUS_LABELS.pendiente;
+                const status = STATUS_LABELS[family.status] ?? STATUS_LABELS.solicitud;
                 return (
                   <tr key={family.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">

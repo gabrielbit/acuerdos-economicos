@@ -37,6 +37,12 @@ export default async function invitationRoutes(fastify: FastifyInstance) {
       [id, token]
     );
 
+    // Auto-transición: solicitud → formulario_enviado
+    await fastify.db.query(
+      `UPDATE families SET status = 'formulario_enviado'::family_status WHERE id = $1 AND status::text = 'solicitud'`,
+      [id]
+    );
+
     return {
       ...result.rows[0],
       family_name: family.rows[0].name,

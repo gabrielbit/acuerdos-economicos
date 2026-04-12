@@ -38,7 +38,6 @@ export default function AgreementForm() {
 
   const [discount, setDiscount] = useState(0);
   const [observations, setObservations] = useState('');
-  const [status, setStatus] = useState<'asignado' | 'en_definicion'>('asignado');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -87,7 +86,6 @@ export default function AgreementForm() {
         period_id: activePeriod.id,
         discount_percentage: discount,
         observations: observations || undefined,
-        status,
       });
       navigate(`/familias/${familyId}`);
     } catch (err) {
@@ -113,31 +111,18 @@ export default function AgreementForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Descuento y estado */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">% Descuento</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={discount}
-              onChange={(e) => setDiscount(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as 'asignado' | 'en_definicion')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-            >
-              <option value="asignado">Asignado</option>
-              <option value="en_definicion">En definición</option>
-            </select>
-          </div>
+        {/* Descuento */}
+        <div className="max-w-xs">
+          <label className="block text-sm font-medium text-gray-700 mb-1">% Descuento</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            value={discount}
+            onChange={(e) => setDiscount(Number(e.target.value))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+          />
         </div>
 
         {/* Preview por hijo */}

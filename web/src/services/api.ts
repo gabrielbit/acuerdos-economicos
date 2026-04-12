@@ -45,6 +45,9 @@ export const api = {
   updateFamily: (id: number, data: Partial<import('../types').Family>) =>
     request<import('../types').Family>(`/families/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
+  updateFamilyStatus: (id: number, status: string) =>
+    request<import('../types').Family>(`/families/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+
   // Estudiantes
   getStudents: (familyId: number) =>
     request<import('../types').Student[]>(`/families/${familyId}/students`),
@@ -87,22 +90,17 @@ export const api = {
   deleteAgreement: (id: number) =>
     request<{ ok: boolean }>(`/agreements/${id}`, { method: 'DELETE' }),
 
-  updateAgreementStatus: (id: number, status: string) =>
-    request<import('../types').Agreement>(`/agreements/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    }),
 
   // Presupuesto
   getBudgetSummary: (periodId?: number) =>
     request<import('../types').BudgetSummary>(`/budget/summary${periodId ? `?period_id=${periodId}` : ''}`),
 
-  // Comentarios
-  getComments: (agreementId: number) =>
-    request<import('../types').Comment[]>(`/agreements/${agreementId}/comments`),
+  // Comentarios (polimórficos)
+  getComments: (entityType: 'family' | 'agreement', entityId: number) =>
+    request<import('../types').Comment[]>(`/comments?entity_type=${entityType}&entity_id=${entityId}`),
 
-  addComment: (agreementId: number, content: string) =>
-    request<import('../types').Comment>(`/agreements/${agreementId}/comments`, {
+  addComment: (entityType: 'family' | 'agreement', entityId: number, content: string) =>
+    request<import('../types').Comment>(`/comments?entity_type=${entityType}&entity_id=${entityId}`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),

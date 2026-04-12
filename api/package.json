@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "node --env-file=.env node_modules/.bin/tsx watch src/server.ts",
     "build": "tsc",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",

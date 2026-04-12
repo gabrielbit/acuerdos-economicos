@@ -15,6 +15,16 @@ export interface User {
   permissions: UserPermissions;
 }
 
+export type FamilyStatus =
+  | 'solicitud'
+  | 'formulario_enviado'
+  | 'formulario_completado'
+  | 'agendado'
+  | 'en_definicion'
+  | 'otorgado'
+  | 'rechazado'
+  | 'suspendido';
+
 export interface Family {
   id: number;
   name: string;
@@ -23,8 +33,8 @@ export interface Family {
   phone: string | null;
   user_id: number | null;
   created_at: string;
+  status: FamilyStatus;
   student_count?: number;
-  agreement_status?: string;
   discount_percentage?: number;
   total_tuition?: number;
   total_to_pay?: number;
@@ -62,14 +72,12 @@ export interface Agreement {
   id: number;
   family_id: number;
   period_id: number;
-  status: 'pendiente' | 'en_definicion' | 'asignado' | 'rechazado' | 'suspendido';
   discount_percentage: number;
   observations: string | null;
   approved_by: number | null;
   created_at: string;
   updated_at: string;
   granted_at: string | null;
-  status_changed_at: string | null;
   students?: AgreementStudent[];
   family?: Family;
 }
@@ -89,7 +97,8 @@ export interface AgreementStudent {
 
 export interface Comment {
   id: number;
-  agreement_id: number;
+  entity_type: 'family' | 'agreement';
+  entity_id: number;
   user_id: number;
   user_name: string;
   content: string;

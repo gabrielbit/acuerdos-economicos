@@ -25,8 +25,8 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     const result = await fastify.db.query(`
       SELECT
         f.id, f.name, f.parent_names, f.email, f.phone, f.user_id, f.created_at,
+        f.status::text AS status,
         COUNT(DISTINCT s.id)::int AS student_count,
-        a.status AS agreement_status,
         a.discount_percentage,
         COALESCE(SUM(ast.base_tuition + ast.extras), 0)::numeric AS total_tuition,
         COALESCE(SUM(ast.amount_to_pay), 0)::numeric AS total_to_pay,
@@ -36,7 +36,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       LEFT JOIN agreements a ON a.family_id = f.id
         AND a.period_id = COALESCE($1::int, (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1))
       LEFT JOIN agreement_students ast ON ast.agreement_id = a.id
-      GROUP BY f.id, a.status, a.discount_percentage
+      GROUP BY f.id, a.discount_percentage
       ORDER BY f.name
     `, [period_id ?? null]);
 
@@ -106,6 +106,30 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     const result = await fastify.db.query(
       `UPDATE families SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
       values
+    );
+
+    if (result.rows.length === 0) {
+      return reply.status(404).send({ error: 'Familia no encontrada' });
+    }
+
+    return result.rows[0];
+  });
+
+  // Cambiar status de familia
+  fastify.patch('/api/families/:id/status', {
+    preHandler: [fastify.requirePermission('canChangeStatus')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { status } = z.object({
+      status: z.enum([
+        'solicitud', 'formulario_enviado', 'formulario_completado',
+        'agendado', 'en_definicion', 'otorgado', 'rechazado', 'suspendido',
+      ]),
+    }).parse(request.body);
+
+    const result = await fastify.db.query(
+      `UPDATE families SET status = $1::family_status WHERE id = $2 RETURNING *`,
+      [status, id]
     );
 
     if (result.rows.length === 0) {

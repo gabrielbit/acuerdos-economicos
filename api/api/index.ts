@@ -18,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Adaptar req/res de Vercel a Fastify
     const response = await fastify.inject({
-      method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
+      method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD',
       url: req.url ?? '/',
       headers: req.headers as Record<string, string>,
       payload: req.body ? JSON.stringify(req.body) : undefined,

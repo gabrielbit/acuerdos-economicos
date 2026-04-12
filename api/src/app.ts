@@ -25,6 +25,7 @@ export async function buildApp() {
   await fastify.register(cors, {
     origin: corsOrigin,
     credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   });
 
   await fastify.register(dbPlugin);

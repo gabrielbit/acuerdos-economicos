@@ -23,18 +23,30 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   suspendido: { label: 'Vencido', className: 'bg-gray-100 text-gray-500' },
 };
 
+interface Interview {
+  id: number;
+  name: string;
+  parent_names: string | null;
+  interview_date: string;
+  status: string;
+}
+
 export default function Dashboard() {
   const [budget, setBudget] = useState<BudgetSummary | null>(null);
   const [families, setFamilies] = useState<Family[]>([]);
+  const [interviews, setInterviews] = useState<Interview[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(
+    new Set(['solicitud', 'formulario_enviado', 'formulario_completado', 'agendado', 'en_definicion'])
+  );
 
   useEffect(() => {
-    Promise.all([api.getBudgetSummary(), api.getFamilies()])
-      .then(([b, f]) => {
+    Promise.all([api.getBudgetSummary(), api.getFamilies(), api.getUpcomingInterviews()])
+      .then(([b, f, i]) => {
         setBudget(b);
         setFamilies(f);
+        setInterviews(i);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -61,7 +73,7 @@ export default function Dashboard() {
   const filteredFamilies = families
     .filter((f) => {
       const matchesName = !filter || f.name.toLowerCase().includes(filter.toLowerCase());
-      const matchesStatus = !statusFilter || f.status === statusFilter;
+      const matchesStatus = statusFilter.size === 0 || statusFilter.has(f.status);
       return matchesName && matchesStatus;
     })
     .sort((a, b) => {
@@ -130,27 +142,94 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Próximas entrevistas */}
+      {interviews.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200">
+          <div className="p-4 border-b border-gray-100">
+            <h2 className="text-sm font-medium text-gray-900">Próximas entrevistas</h2>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {interviews.map((interview) => {
+              const date = new Date(interview.interview_date);
+              const isToday = date.toDateString() === new Date().toDateString();
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              const isTomorrow = date.toDateString() === tomorrow.toDateString();
+              const isPast = date < new Date();
+
+              const dateLabel = isToday
+                ? 'Hoy'
+                : isTomorrow
+                  ? 'Mañana'
+                  : date.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' });
+
+              const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+              return (
+                <Link key={interview.id} to={`/familias/${interview.id}`}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <span className={`text-sm font-medium min-w-[56px] ${isPast ? 'text-gray-400' : isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+                    {dateLabel} {time}
+                  </span>
+                  <span className="text-sm text-gray-900">{interview.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Filtros y tabla de familias */}
       <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-4 border-b border-gray-100 flex items-center gap-3">
-          <h2 className="text-sm font-medium text-gray-900 mr-auto">Familias</h2>
-          <input
-            type="text"
-            placeholder="Buscar familia..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-          />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
-          >
-            <option value="">Todos los estados</option>
-            <option value="asignado">Asignado</option>
-            <option value="en_definicion">En definición</option>
-            <option value="pendiente">Pendiente</option>
-          </select>
+        <div className="p-4 border-b border-gray-100 space-y-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-medium text-gray-900">Familias</h2>
+            <input
+              type="text"
+              placeholder="Buscar familia..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            />
+            <span className="ml-auto text-xs text-gray-400">{filteredFamilies.length} familias</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => {
+                const allKeys = Object.keys(STATUS_LABELS);
+                setStatusFilter((prev) => prev.size === allKeys.length ? new Set() : new Set(allKeys));
+              }}
+              className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
+                statusFilter.size === Object.keys(STATUS_LABELS).length || statusFilter.size === 0
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              Todos
+            </button>
+            {Object.entries(STATUS_LABELS).map(([key, { label, className }]) => {
+              const active = statusFilter.has(key);
+              return (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setStatusFilter((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(key)) next.delete(key); else next.add(key);
+                      return next;
+                    });
+                  }}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
+                    active
+                      ? `${className} border-current`
+                      : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <table className="w-full">
           <thead>

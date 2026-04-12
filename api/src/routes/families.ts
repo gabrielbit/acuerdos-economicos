@@ -25,7 +25,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     const result = await fastify.db.query(`
       SELECT
         f.id, f.name, f.parent_names, f.email, f.phone, f.user_id, f.created_at,
-        f.status::text AS status,
+        f.status::text AS status, f.interview_date,
         COUNT(DISTINCT s.id)::int AS student_count,
         a.discount_percentage,
         COALESCE(SUM(ast.base_tuition + ast.extras), 0)::numeric AS total_tuition,
@@ -40,6 +40,22 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       ORDER BY f.name
     `, [period_id ?? null]);
 
+    return result.rows;
+  });
+
+  // Próximas entrevistas (antes de :id para evitar conflicto)
+  fastify.get('/api/families/interviews', {
+    preHandler: [fastify.requireCommittee],
+  }, async () => {
+    const result = await fastify.db.query(`
+      SELECT f.id, f.name, f.parent_names, f.interview_date, f.status::text AS status
+      FROM families f
+      WHERE f.interview_date IS NOT NULL
+        AND f.interview_date >= NOW() - INTERVAL '1 day'
+        AND f.status::text IN ('agendado', 'formulario_completado')
+      ORDER BY f.interview_date ASC
+      LIMIT 20
+    `);
     return result.rows;
   });
 
@@ -120,16 +136,40 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     preHandler: [fastify.requirePermission('canChangeStatus')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { status } = z.object({
+    const data = z.object({
       status: z.enum([
         'solicitud', 'formulario_enviado', 'formulario_completado',
         'agendado', 'en_definicion', 'otorgado', 'rechazado', 'suspendido',
       ]),
+      interview_date: z.string().nullable().optional(),
     }).parse(request.body);
 
     const result = await fastify.db.query(
-      `UPDATE families SET status = $1::family_status WHERE id = $2 RETURNING *`,
-      [status, id]
+      `UPDATE families SET status = $1::family_status,
+        interview_date = CASE WHEN $3 THEN $4::timestamptz ELSE interview_date END
+       WHERE id = $2 RETURNING *`,
+      [data.status, id, data.interview_date !== undefined, data.interview_date ?? null]
+    );
+
+    if (result.rows.length === 0) {
+      return reply.status(404).send({ error: 'Familia no encontrada' });
+    }
+
+    return result.rows[0];
+  });
+
+  // Actualizar fecha de entrevista
+  fastify.patch('/api/families/:id/interview', {
+    preHandler: [fastify.requirePermission('canChangeStatus')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { interview_date } = z.object({
+      interview_date: z.string().nullable(),
+    }).parse(request.body);
+
+    const result = await fastify.db.query(
+      `UPDATE families SET interview_date = $1::timestamptz WHERE id = $2 RETURNING *`,
+      [interview_date, id]
     );
 
     if (result.rows.length === 0) {

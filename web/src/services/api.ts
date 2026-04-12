@@ -45,8 +45,20 @@ export const api = {
   updateFamily: (id: number, data: Partial<import('../types').Family>) =>
     request<import('../types').Family>(`/families/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
-  updateFamilyStatus: (id: number, status: string) =>
-    request<import('../types').Family>(`/families/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  updateFamilyStatus: (id: number, status: string, interview_date?: string | null) =>
+    request<import('../types').Family>(`/families/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, ...(interview_date !== undefined ? { interview_date } : {}) }),
+    }),
+
+  updateInterviewDate: (id: number, interview_date: string | null) =>
+    request<import('../types').Family>(`/families/${id}/interview`, {
+      method: 'PATCH',
+      body: JSON.stringify({ interview_date }),
+    }),
+
+  getUpcomingInterviews: () =>
+    request<Array<{ id: number; name: string; parent_names: string | null; interview_date: string; status: string }>>('/families/interviews'),
 
   // Estudiantes
   getStudents: (familyId: number) =>

@@ -75,6 +75,11 @@ export default function FamilyDetail() {
   const [editPhone, setEditPhone] = useState('');
   const [savingFamily, setSavingFamily] = useState(false);
 
+  // Entrevista
+  const [editingInterview, setEditingInterview] = useState(false);
+  const [interviewInput, setInterviewInput] = useState('');
+  const [savingInterview, setSavingInterview] = useState(false);
+
   // Nuevo estudiante
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
@@ -105,6 +110,92 @@ export default function FamilyDetail() {
   useEffect(() => {
     loadData().finally(() => setLoading(false));
   }, [id]);
+
+  const parseInterviewInput = (val: string): Date | null => {
+    const parts = val.match(/^(\S+)\s+(\d{1,2}):(\d{2})$/);
+    if (!parts) return null;
+    const [, dayPart, h, m] = parts;
+    const today = new Date();
+    let date: Date | null = null;
+    // try dd/mm
+    const dmMatch = dayPart.match(/^(\d{1,2})\/(\d{1,2})$/);
+    if (dmMatch) {
+      date = new Date(today.getFullYear(), Number(dmMatch[2]) - 1, Number(dmMatch[1]));
+    }
+    // try dd/mm/yyyy
+    const dmyMatch = dayPart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmyMatch) {
+      date = new Date(Number(dmyMatch[3]), Number(dmyMatch[2]) - 1, Number(dmyMatch[1]));
+    }
+    if (!date || isNaN(date.getTime())) return null;
+    date.setHours(Number(h), Number(m), 0, 0);
+    return date;
+  };
+
+  const formatInterviewInput = (d: Date): string => {
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const setInterviewDay = (dateStr: string) => {
+    const parsed = parseInterviewInput(interviewInput);
+    const timePart = parsed ? `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}` : '10:00';
+    const d = new Date(dateStr);
+    setInterviewInput(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${timePart}`);
+  };
+
+  const setInterviewHour = (hour: number) => {
+    const parsed = parseInterviewInput(interviewInput);
+    const dayPart = parsed ? `${String(parsed.getDate()).padStart(2, '0')}/${String(parsed.getMonth() + 1).padStart(2, '0')}` : '';
+    if (!dayPart) return;
+    const min = parsed ? String(parsed.getMinutes()).padStart(2, '0') : '00';
+    setInterviewInput(`${dayPart} ${String(hour).padStart(2, '0')}:${min}`);
+  };
+
+  const setInterviewMinute = (minute: number) => {
+    const parsed = parseInterviewInput(interviewInput);
+    if (!parsed) return;
+    const dayPart = `${String(parsed.getDate()).padStart(2, '0')}/${String(parsed.getMonth() + 1).padStart(2, '0')}`;
+    setInterviewInput(`${dayPart} ${String(parsed.getHours()).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+  };
+
+  const saveInterviewDate = async () => {
+    const parsed = parseInterviewInput(interviewInput);
+    if (!family || !parsed) return;
+    setSavingInterview(true);
+    try {
+      await api.updateInterviewDate(family.id, parsed.toISOString());
+      setEditingInterview(false);
+      setLoading(true);
+      await loadData();
+    } finally {
+      setSavingInterview(false);
+      setLoading(false);
+    }
+  };
+
+  const getNextWeekdays = () => {
+    const days: { value: string; label: string }[] = [];
+    const today = new Date();
+    let added = 0;
+    for (let i = 0; added < 10; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      const dow = d.getDay();
+      if (dow === 0 || dow === 6) continue;
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const label = i === 0
+        ? 'Hoy'
+        : i === 1
+          ? 'Mañana'
+          : d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
+      days.push({ value, label });
+      added++;
+    }
+    return days;
+  };
+
+  const hours = Array.from({ length: 11 }, (_, i) => i + 8); // 8..18
+  const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
   const generateInvitation = async () => {
     if (!family) return;
@@ -332,6 +423,129 @@ export default function FamilyDetail() {
           </>
         )}
       </div>
+
+      {/* Entrevista */}
+      {(family.status === 'agendado' || family.interview_date) && (
+        <div className="bg-white rounded-xl border border-gray-200">
+          <div className="p-4 flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-900">Entrevista</span>
+            {!editingInterview && family.interview_date ? (
+              <>
+                <span className="flex-1 text-sm text-gray-700">
+                  {new Date(family.interview_date).toLocaleDateString('es-AR', {
+                    weekday: 'long', day: 'numeric', month: 'long',
+                  })} a las {new Date(family.interview_date).toLocaleTimeString('es-AR', {
+                    hour: '2-digit', minute: '2-digit',
+                  })}
+                </span>
+                {can('canChangeStatus') && (
+                  <>
+                    <button onClick={() => {
+                      setInterviewInput(formatInterviewInput(new Date(family.interview_date!)));
+                      setEditingInterview(true);
+                    }} className="text-xs text-gray-400 hover:text-gray-600">Cambiar</button>
+                    <button onClick={async () => {
+                      await api.updateInterviewDate(family.id, null);
+                      setLoading(true);
+                      await loadData();
+                      setLoading(false);
+                    }} className="text-xs text-red-400 hover:text-red-600">Borrar</button>
+                  </>
+                )}
+              </>
+            ) : !editingInterview ? (
+              <>
+                <span className="flex-1 text-sm text-gray-400">Sin fecha asignada</span>
+                {can('canChangeStatus') && (
+                  <button onClick={() => { setInterviewInput(''); setEditingInterview(true); }}
+                    className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800">
+                    Agendar
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="flex-1 flex items-center gap-2 justify-end">
+                <button onClick={saveInterviewDate} disabled={savingInterview || !parseInterviewInput(interviewInput)}
+                  className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50">
+                  {savingInterview ? '...' : 'Guardar'}
+                </button>
+                <button onClick={() => setEditingInterview(false)}
+                  className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+          {editingInterview && (() => {
+            const parsed = parseInterviewInput(interviewInput);
+            const selectedDayStr = parsed
+              ? `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+              : '';
+            return (
+              <div className="px-4 pb-4 space-y-3">
+                <div>
+                  <input
+                    type="text"
+                    value={interviewInput}
+                    onChange={(e) => setInterviewInput(e.target.value)}
+                    placeholder="dd/mm HH:MM"
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
+                      interviewInput && !parsed ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1.5">Día</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {getNextWeekdays().map((day) => (
+                      <button key={day.value} onClick={() => setInterviewDay(day.value)}
+                        className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap ${
+                          selectedDayStr === day.value
+                            ? 'bg-gray-900 text-white border-gray-900'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                        }`}>
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1.5">Hora</p>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {hours.map((h) => (
+                        <button key={h} onClick={() => setInterviewHour(h)}
+                          className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                            parsed && parsed.getHours() === h
+                              ? 'bg-gray-900 text-white border-gray-900'
+                              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                          }`}>
+                          {h}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1.5">Minutos</p>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {minutes.map((m) => (
+                        <button key={m} onClick={() => setInterviewMinute(m)}
+                          className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                            parsed && parsed.getMinutes() === m
+                              ? 'bg-gray-900 text-white border-gray-900'
+                              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                          }`}>
+                          {String(m).padStart(2, '0')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Invitación */}
       {can('canManageFamilies') && (

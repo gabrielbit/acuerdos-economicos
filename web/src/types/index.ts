@@ -37,6 +37,7 @@ export interface Family {
   user_id: number | null;
   created_at: string;
   status: FamilyStatus;
+  interview_date: string | null;
   student_count?: number;
   discount_percentage?: number;
   total_tuition?: number;

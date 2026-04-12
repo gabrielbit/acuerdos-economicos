@@ -35,7 +35,21 @@ const STATUS_ORDER: Record<string, number> = {
   suspendido: 7,
 };
 
-type SortKey = 'name' | 'student_count' | 'status' | 'discount' | 'total_discount';
+function formatInterviewShort(dateStr: string | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = d.toDateString() === tomorrow.toDateString();
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (isToday) return `Hoy ${time}`;
+  if (isTomorrow) return `Mañana ${time}`;
+  return `${d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' })} ${time}`;
+}
+
+type SortKey = 'name' | 'student_count' | 'status' | 'discount' | 'total_discount' | 'interview';
 type SortDir = 'asc' | 'desc';
 
 function SortHeader({ label, sortKey, current, direction, onSort, align }: {
@@ -114,6 +128,11 @@ export default function FamilyList() {
           return (Number(a.discount_percentage ?? 0) - Number(b.discount_percentage ?? 0)) * dir;
         case 'total_discount':
           return (Number(a.total_discount ?? 0) - Number(b.total_discount ?? 0)) * dir;
+        case 'interview': {
+          const da = a.interview_date ? new Date(a.interview_date).getTime() : 0;
+          const db = b.interview_date ? new Date(b.interview_date).getTime() : 0;
+          return (da - db) * dir;
+        }
         default:
           return 0;
       }
@@ -193,6 +212,7 @@ export default function FamilyList() {
               <SortHeader label="Familia" sortKey="name" current={sortKey} direction={sortDir} onSort={handleSort} />
               <SortHeader label="Hijos" sortKey="student_count" current={sortKey} direction={sortDir} onSort={handleSort} />
               <SortHeader label="Estado" sortKey="status" current={sortKey} direction={sortDir} onSort={handleSort} />
+              <SortHeader label="Entrevista" sortKey="interview" current={sortKey} direction={sortDir} onSort={handleSort} />
               <SortHeader label="% Descuento" sortKey="discount" current={sortKey} direction={sortDir} onSort={handleSort} align="right" />
               <SortHeader label="Descuento mensual" sortKey="total_discount" current={sortKey} direction={sortDir} onSort={handleSort} align="right" />
             </tr>
@@ -200,7 +220,7 @@ export default function FamilyList() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
                   No se encontraron familias
                 </td>
               </tr>
@@ -222,6 +242,9 @@ export default function FamilyList() {
                       <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${status.className}`}>
                         {status.label}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {family.interview_date ? formatInterviewShort(family.interview_date) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right">
                       {family.discount_percentage ? `${Number(family.discount_percentage).toFixed(0)}%` : '—'}

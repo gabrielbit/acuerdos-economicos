@@ -3,6 +3,20 @@ import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { BudgetSummary, Family } from '../../types';
 
+function formatInterviewShort(dateStr: string | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = d.toDateString() === tomorrow.toDateString();
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (isToday) return `Hoy ${time}`;
+  if (isTomorrow) return `Mañana ${time}`;
+  return `${d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' })} ${time}`;
+}
+
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -237,6 +251,7 @@ export default function Dashboard() {
               <th className="px-4 py-3 font-medium">Familia</th>
               <th className="px-4 py-3 font-medium">Hijos</th>
               <th className="px-4 py-3 font-medium">Estado</th>
+              <th className="px-4 py-3 font-medium">Entrevista</th>
               <th className="px-4 py-3 font-medium text-right">% Descuento</th>
               <th className="px-4 py-3 font-medium text-right">Cuota total</th>
               <th className="px-4 py-3 font-medium text-right">Descuento mensual</th>
@@ -245,7 +260,7 @@ export default function Dashboard() {
           <tbody>
             {filteredFamilies.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
                   No se encontraron familias
                 </td>
               </tr>
@@ -264,6 +279,9 @@ export default function Dashboard() {
                       <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${status.className}`}>
                         {status.label}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {family.interview_date ? formatInterviewShort(family.interview_date) : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right">
                       {family.discount_percentage ? `${family.discount_percentage}%` : '—'}

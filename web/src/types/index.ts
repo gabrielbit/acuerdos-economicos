@@ -31,6 +31,9 @@ export interface Family {
   parent_names: string | null;
   email: string | null;
   phone: string | null;
+  address: string | null;
+  locality: string | null;
+  postal_code: string | null;
   user_id: number | null;
   created_at: string;
   status: FamilyStatus;

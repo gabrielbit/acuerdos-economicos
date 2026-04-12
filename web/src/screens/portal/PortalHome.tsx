@@ -9,12 +9,6 @@ function formatMoney(amount: number): string {
   }).format(amount);
 }
 
-const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  asignado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
-  en_definicion: { label: 'En definición', className: 'bg-amber-50 text-amber-700' },
-  pendiente: { label: 'Pendiente', className: 'bg-purple-50 text-purple-700' },
-};
-
 const LEVEL_LABELS: Record<string, string> = {
   jardin: 'Jardín', primaria: 'Primaria', secundaria: 'Secundaria', '12vo': '12vo',
 };
@@ -32,7 +26,7 @@ export default function PortalHome() {
 
   if (loading) return <p className="text-sm text-gray-500 py-8 text-center">Cargando...</p>;
 
-  const activeAgreement = agreements.find((a) => ['asignado', 'en_definicion', 'pendiente'].includes(a.status));
+  const activeAgreement = agreements.length > 0 ? agreements[0] : null;
 
   return (
     <div className="space-y-6">
@@ -43,12 +37,7 @@ export default function PortalHome() {
         <div className="bg-white rounded-xl border border-gray-200">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-sm font-medium text-gray-900">Acuerdo actual</h2>
-            <div className="flex items-center gap-3">
-              <span className={`px-3 py-1 text-sm font-medium rounded-full ${STATUS_LABELS[activeAgreement.status]?.className ?? ''}`}>
-                {STATUS_LABELS[activeAgreement.status]?.label ?? activeAgreement.status}
-              </span>
-              <span className="text-sm text-gray-500">{activeAgreement.discount_percentage}% de descuento</span>
-            </div>
+            <span className="text-sm text-gray-500">{activeAgreement.discount_percentage}% de descuento</span>
           </div>
           {activeAgreement.students && activeAgreement.students.length > 0 ? (
             <table className="w-full">

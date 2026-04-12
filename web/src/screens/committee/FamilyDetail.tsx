@@ -60,7 +60,6 @@ export default function FamilyDetail() {
   // Edición de acuerdo
   const [editing, setEditing] = useState(false);
   const [editDiscount, setEditDiscount] = useState(0);
-  const [editStatus, setEditStatus] = useState('');
   const [editObs, setEditObs] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -126,7 +125,6 @@ export default function FamilyDetail() {
   const startEditing = () => {
     if (!agreement) return;
     setEditDiscount(Number(agreement.discount_percentage));
-    setEditStatus(agreement.status);
     setEditObs(agreement.observations ?? '');
     setEditing(true);
   };
@@ -505,16 +503,11 @@ export default function FamilyDetail() {
           ) : (
             <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin detalle por estudiante</p>
           )}
-          {!editing && (agreement.observations || agreement.granted_at || agreement.status_changed_at) && (
+          {!editing && (agreement.observations || agreement.granted_at) && (
             <div className="px-4 py-3 border-t border-gray-100 space-y-2">
-              {(agreement.granted_at || agreement.status_changed_at) && (
+              {agreement.granted_at && (
                 <div className="flex gap-6 text-xs text-gray-400">
-                  {agreement.granted_at && (
-                    <span>Otorgado el {new Date(agreement.granted_at).toLocaleDateString('es-AR')}</span>
-                  )}
-                  {agreement.status_changed_at && (
-                    <span>Último cambio de estado: {new Date(agreement.status_changed_at).toLocaleDateString('es-AR')}</span>
-                  )}
+                  <span>Otorgado el {new Date(agreement.granted_at).toLocaleDateString('es-AR')}</span>
                 </div>
               )}
               {agreement.observations && (

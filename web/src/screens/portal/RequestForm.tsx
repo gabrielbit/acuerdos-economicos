@@ -21,7 +21,7 @@ interface Child {
 
 export default function RequestForm() {
   const navigate = useNavigate();
-  const [existing, setExisting] = useState<AidRequest | null>(null);
+  const [_existing, setExisting] = useState<AidRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -80,8 +80,8 @@ export default function RequestForm() {
       .then((f) => {
         if (f) {
           if (!address && f.address) setAddress(f.address);
-          if (!locality && f.locality) setLocality(f.locality as string);
-          if (!postalCode && f.postal_code) setPostalCode(f.postal_code as string);
+          if (!locality && f.locality) setLocality(f.locality);
+          if (!postalCode && f.postal_code) setPostalCode(f.postal_code);
           if (!phone && f.phone) setPhone(f.phone);
         }
       })

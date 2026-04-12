@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { api } from '../services/api';
-import { useAuth } from '../hooks/useAuth';
 
 export default function Register() {
   const { token } = useParams<{ token: string }>();
-  const navigate = useNavigate();
-  const { login: setAuthFromToken } = useAuth();
 
   const [familyName, setFamilyName] = useState('');
   const [valid, setValid] = useState<boolean | null>(null);

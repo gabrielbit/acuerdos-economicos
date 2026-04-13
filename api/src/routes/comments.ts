@@ -51,6 +51,38 @@ export default async function commentRoutes(fastify: FastifyInstance) {
     return comment.rows[0];
   });
 
+  // Últimas notas globales agrupadas por familia (para dashboard)
+  fastify.get('/api/comments/recent', {
+    preHandler: [fastify.requireCommittee],
+  }, async () => {
+    const result = await fastify.db.query(`
+      SELECT c.id, c.content, c.created_at, c.entity_type,
+        u.name AS user_name,
+        COALESCE(f.id, fa.id) AS family_id,
+        COALESCE(f.name, fa.name) AS family_name
+      FROM comments c
+      JOIN users u ON u.id = c.user_id
+      LEFT JOIN families f ON c.entity_type = 'family' AND f.id = c.entity_id
+      LEFT JOIN agreements a ON c.entity_type = 'agreement' AND a.id = c.entity_id
+      LEFT JOIN families fa ON a.family_id = fa.id
+      WHERE COALESCE(f.id, fa.id) IN (
+        SELECT DISTINCT sub_fam_id FROM (
+          SELECT COALESCE(f2.id, fa2.id) AS sub_fam_id,
+            MAX(c2.created_at) AS last_note
+          FROM comments c2
+          LEFT JOIN families f2 ON c2.entity_type = 'family' AND f2.id = c2.entity_id
+          LEFT JOIN agreements a2 ON c2.entity_type = 'agreement' AND a2.id = c2.entity_id
+          LEFT JOIN families fa2 ON a2.family_id = fa2.id
+          GROUP BY COALESCE(f2.id, fa2.id)
+          ORDER BY last_note DESC
+          LIMIT 5
+        ) recent_families
+      )
+      ORDER BY c.created_at DESC
+    `);
+    return result.rows;
+  });
+
   // Backward-compatible routes (agreement comments)
   fastify.get('/api/agreements/:id/comments', {
     preHandler: [fastify.requireAuth],

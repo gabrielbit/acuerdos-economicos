@@ -74,13 +74,17 @@ export default function Dashboard() {
   );
 
   useEffect(() => {
-    Promise.all([api.getBudgetSummary(), api.getFamilies(), api.getUpcomingInterviews(), api.getRecentComments()])
-      .then(([b, f, i, notes]) => {
-        setBudget(b);
-        setFamilies(f);
-        setInterviews(i);
-        setRecentNotes(notes);
-      })
+    Promise.all([
+      api.getBudgetSummary().catch(() => null),
+      api.getFamilies().catch(() => []),
+      api.getUpcomingInterviews().catch(() => []),
+      api.getRecentComments().catch(() => []),
+    ]).then(([b, f, i, notes]) => {
+      setBudget(b);
+      setFamilies(f);
+      setInterviews(i);
+      setRecentNotes(notes);
+    })
       .finally(() => setLoading(false));
   }, []);
 

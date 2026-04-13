@@ -3,13 +3,21 @@ import { buildApp } from '../src/app.js';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance | null = null;
+let appPromise: Promise<FastifyInstance> | null = null;
 
 async function getApp() {
-  if (!app) {
-    app = await buildApp();
-    await app.ready();
+  if (app) return app;
+  if (!appPromise) {
+    appPromise = buildApp().then(async (instance) => {
+      await instance.ready();
+      app = instance;
+      return instance;
+    }).catch((err) => {
+      appPromise = null;
+      throw err;
+    });
   }
-  return app;
+  return appPromise;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

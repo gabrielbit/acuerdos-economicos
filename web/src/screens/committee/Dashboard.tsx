@@ -75,9 +75,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      api.getBudgetSummary(),
-      api.getFamilies(),
-      api.getUpcomingInterviews(),
+      api.getBudgetSummary().catch(() => null),
+      api.getFamilies().catch(() => []),
+      api.getUpcomingInterviews().catch(() => []),
       api.getRecentComments().catch(() => []),
     ]).then(([b, f, i, notes]) => {
       setBudget(b);

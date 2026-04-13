@@ -1,5 +1,8 @@
 {
   "buildCommand": "",
+  "crons": [
+    { "path": "/api/health", "schedule": "0 */3 * * *" }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" }
   ],

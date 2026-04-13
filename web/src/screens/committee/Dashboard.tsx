@@ -26,6 +26,20 @@ function formatMoney(amount: number): string {
   }).format(amount);
 }
 
+function timeAgo(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'hace un momento';
+  if (diffMins < 60) return `hace ${diffMins} min`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `hace ${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `hace ${diffDays}d`;
+  return date.toLocaleDateString('es-AR');
+}
+
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   solicitud: { label: 'Solicitud', className: 'bg-purple-50 text-purple-700' },
   formulario_enviado: { label: 'Form. enviado', className: 'bg-violet-50 text-violet-700' },
@@ -49,6 +63,10 @@ export default function Dashboard() {
   const [budget, setBudget] = useState<BudgetSummary | null>(null);
   const [families, setFamilies] = useState<Family[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [recentNotes, setRecentNotes] = useState<Array<{
+    id: number; content: string; user_name: string; created_at: string;
+    entity_type: string; family_name: string | null; family_id: number | null;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<Set<string>>(
@@ -56,11 +74,12 @@ export default function Dashboard() {
   );
 
   useEffect(() => {
-    Promise.all([api.getBudgetSummary(), api.getFamilies(), api.getUpcomingInterviews()])
-      .then(([b, f, i]) => {
+    Promise.all([api.getBudgetSummary(), api.getFamilies(), api.getUpcomingInterviews(), api.getRecentComments()])
+      .then(([b, f, i, notes]) => {
         setBudget(b);
         setFamilies(f);
         setInterviews(i);
+        setRecentNotes(notes);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -192,6 +211,52 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Últimas notas agrupadas por familia */}
+      {recentNotes.length > 0 && (() => {
+        const grouped: Array<{
+          family_id: number; family_name: string;
+          notes: typeof recentNotes;
+        }> = [];
+        const seen = new Set<number>();
+        for (const note of recentNotes) {
+          if (!note.family_id || !note.family_name) continue;
+          if (!seen.has(note.family_id)) {
+            seen.add(note.family_id);
+            grouped.push({
+              family_id: note.family_id,
+              family_name: note.family_name,
+              notes: recentNotes.filter((n) => n.family_id === note.family_id),
+            });
+          }
+        }
+        return grouped.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-sm font-medium text-gray-900">Actividad reciente</h2>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {grouped.map((group) => (
+                <div key={group.family_id} className="px-4 py-3">
+                  <Link to={`/familias/${group.family_id}`}
+                    className="text-sm font-medium text-gray-900 hover:underline">
+                    {group.family_name}
+                  </Link>
+                  <div className="mt-1.5 space-y-1.5">
+                    {group.notes.map((note) => (
+                      <div key={note.id} className="flex gap-2 items-baseline">
+                        <span className="text-xs text-gray-400 shrink-0 w-16">{timeAgo(note.created_at)}</span>
+                        <span className="text-xs text-gray-500 shrink-0">{note.user_name}:</span>
+                        <p className="text-sm text-gray-600 line-clamp-1">{note.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Filtros y tabla de familias */}
       <div className="bg-white rounded-xl border border-gray-200">

@@ -111,6 +111,12 @@ export const api = {
   getComments: (entityType: 'family' | 'agreement', entityId: number) =>
     request<import('../types').Comment[]>(`/comments?entity_type=${entityType}&entity_id=${entityId}`),
 
+  getRecentComments: () =>
+    request<Array<{
+      id: number; content: string; user_name: string; created_at: string;
+      entity_type: string; family_name: string | null; family_id: number | null;
+    }>>('/comments/recent'),
+
   addComment: (entityType: 'family' | 'agreement', entityId: number, content: string) =>
     request<import('../types').Comment>(`/comments?entity_type=${entityType}&entity_id=${entityId}`, {
       method: 'POST',

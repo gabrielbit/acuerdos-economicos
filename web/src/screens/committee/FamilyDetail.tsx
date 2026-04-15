@@ -164,7 +164,8 @@ export default function FamilyDetail() {
   const setInterviewDay = (dateStr: string) => {
     const parsed = parseInterviewInput(interviewInput);
     const timePart = parsed ? `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}` : '10:00';
-    const d = new Date(dateStr);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
     setInterviewInput(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${timePart}`);
   };
 

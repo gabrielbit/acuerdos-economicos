@@ -180,4 +180,16 @@ export interface BudgetSummary {
   families_assigned: number;
   families_in_definition: number;
   families_pending: number;
+  students_assigned: number;
+}
+
+export interface BudgetHistoryEntry {
+  month: string;
+  total_budget: number;
+  families_joined: number;
+  amount_joined: number;
+  joined_percentage: number;
+  families_dropped: number;
+  amount_dropped: number;
+  dropped_percentage: number;
 }

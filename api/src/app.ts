@@ -13,6 +13,7 @@ import invitationRoutes from './routes/invitations.js';
 import portalRoutes from './routes/portal.js';
 import requestRoutes from './routes/requests.js';
 import feeScheduleRoutes from './routes/fee-schedules.js';
+import settingsRoutes from './routes/settings.js';
 
 export async function buildApp() {
   const fastify = Fastify({
@@ -43,6 +44,7 @@ export async function buildApp() {
   await fastify.register(portalRoutes);
   await fastify.register(requestRoutes);
   await fastify.register(feeScheduleRoutes);
+  await fastify.register(settingsRoutes);
 
   fastify.get('/api/health', async () => ({ status: 'ok' }));
 

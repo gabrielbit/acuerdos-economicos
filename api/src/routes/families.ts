@@ -15,6 +15,8 @@ const createStudentSchema = z.object({
   file_number: z.string().optional(),
 });
 
+const updateStudentSchema = createStudentSchema.partial();
+
 export default async function familyRoutes(fastify: FastifyInstance) {
   // Listar familias con datos del acuerdo del período activo
   fastify.get('/api/families', {
@@ -144,6 +146,64 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       interview_date: z.string().nullable().optional(),
     }).parse(request.body);
 
+    if (data.status === 'otorgado') {
+      const validation = await fastify.db.query(`
+        WITH active_period AS (
+          SELECT id
+          FROM aid_periods
+          WHERE is_active = true
+          LIMIT 1
+        ),
+        family_students AS (
+          SELECT COUNT(*)::int AS total_students
+          FROM students
+          WHERE family_id = $1
+        ),
+        agreement_impact AS (
+          SELECT
+            a.id AS agreement_id,
+            COUNT(DISTINCT ast.student_id)::int AS impacted_students
+          FROM agreements a
+          JOIN active_period ap ON ap.id = a.period_id
+          LEFT JOIN agreement_students ast ON ast.agreement_id = a.id
+          WHERE a.family_id = $1
+          GROUP BY a.id
+          ORDER BY a.created_at DESC
+          LIMIT 1
+        )
+        SELECT
+          fs.total_students,
+          ai.agreement_id,
+          COALESCE(ai.impacted_students, 0) AS impacted_students
+        FROM family_students fs
+        LEFT JOIN agreement_impact ai ON true
+      `, [id]);
+
+      const row = validation.rows[0] as {
+        total_students: number;
+        agreement_id: number | null;
+        impacted_students: number;
+      } | undefined;
+
+      if (!row?.agreement_id) {
+        return reply.status(400).send({
+          error: 'Para otorgar, la familia debe tener un acuerdo activo.',
+        });
+      }
+
+      if (row.total_students <= 0) {
+        return reply.status(400).send({
+          error: 'Para otorgar, la familia debe tener al menos un estudiante cargado.',
+        });
+      }
+
+      if (row.impacted_students !== row.total_students) {
+        return reply.status(400).send({
+          error: 'Para otorgar, el acuerdo debe tener impacto cargado en cada hijo.',
+        });
+      }
+    }
+
     const result = await fastify.db.query(
       `UPDATE families SET status = $1::family_status,
         interview_date = CASE WHEN $3 THEN $4::timestamptz ELSE interview_date END
@@ -154,6 +214,17 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     if (result.rows.length === 0) {
       return reply.status(404).send({ error: 'Familia no encontrada' });
     }
+
+    await fastify.db.query(
+      `UPDATE agreements
+       SET ended_at = CASE
+         WHEN $1::text = 'suspendido' THEN COALESCE(ended_at, NOW())
+         ELSE NULL
+       END
+       WHERE family_id = $2
+         AND period_id = (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1)`,
+      [data.status, id]
+    );
 
     return result.rows[0];
   });
@@ -312,5 +383,60 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       [id, data.name, data.level, data.grade, data.file_number]
     );
     return result.rows[0];
+  });
+
+  // Actualizar estudiante
+  fastify.put('/api/families/:familyId/students/:studentId', {
+    preHandler: [fastify.requirePermission('canManageFamilies')],
+  }, async (request, reply) => {
+    const { familyId, studentId } = request.params as { familyId: string; studentId: string };
+    const data = updateStudentSchema.parse(request.body);
+
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        fields.push(`${key} = $${idx++}`);
+        values.push(value);
+      }
+    }
+
+    if (fields.length === 0) {
+      return reply.status(400).send({ error: 'No hay campos para actualizar' });
+    }
+
+    values.push(studentId, familyId);
+    const result = await fastify.db.query(
+      `UPDATE students
+       SET ${fields.join(', ')}
+       WHERE id = $${idx++} AND family_id = $${idx}
+       RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return reply.status(404).send({ error: 'Estudiante no encontrado' });
+    }
+
+    return result.rows[0];
+  });
+
+  // Eliminar estudiante
+  fastify.delete('/api/families/:familyId/students/:studentId', {
+    preHandler: [fastify.requirePermission('canManageFamilies')],
+  }, async (request, reply) => {
+    const { familyId, studentId } = request.params as { familyId: string; studentId: string };
+    const result = await fastify.db.query(
+      'DELETE FROM students WHERE id = $1 AND family_id = $2 RETURNING id',
+      [studentId, familyId]
+    );
+
+    if (result.rows.length === 0) {
+      return reply.status(404).send({ error: 'Estudiante no encontrado' });
+    }
+
+    return { ok: true };
   });
 }

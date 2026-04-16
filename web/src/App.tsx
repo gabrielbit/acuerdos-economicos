@@ -12,6 +12,7 @@ import Config from './screens/committee/Config';
 import Users from './screens/committee/Users';
 import Requests from './screens/committee/Requests';
 import RequestDetail from './screens/committee/RequestDetail';
+import Script from './screens/committee/Script';
 import PortalLayout from './screens/portal/PortalLayout';
 import PortalHome from './screens/portal/PortalHome';
 import RequestForm from './screens/portal/RequestForm';
@@ -53,6 +54,7 @@ function AppRoutes() {
         <Route path="/familias/:id" element={<FamilyDetail />} />
         <Route path="/familias/:familyId/nuevo-acuerdo" element={<AgreementForm />} />
         <Route path="/configuracion" element={<Config />} />
+        <Route path="/script" element={<Script />} />
         <Route path="/solicitudes" element={<Requests />} />
         <Route path="/solicitudes/:id" element={<RequestDetail />} />
         <Route path="/usuarios" element={<Users />} />

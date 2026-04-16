@@ -66,6 +66,10 @@ export const api = {
 
   createStudent: (familyId: number, data: { name: string; level: string; grade: string; file_number?: string }) =>
     request<import('../types').Student>(`/families/${familyId}/students`, { method: 'POST', body: JSON.stringify(data) }),
+  updateStudent: (familyId: number, studentId: number, data: Partial<{ name: string; level: string; grade: string; file_number: string }>) =>
+    request<import('../types').Student>(`/families/${familyId}/students/${studentId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteStudent: (familyId: number, studentId: number) =>
+    request<{ ok: boolean }>(`/families/${familyId}/students/${studentId}`, { method: 'DELETE' }),
 
   // Períodos
   getPeriods: () => request<import('../types').AidPeriod[]>('/periods'),
@@ -106,6 +110,17 @@ export const api = {
   // Presupuesto
   getBudgetSummary: (periodId?: number) =>
     request<import('../types').BudgetSummary>(`/budget/summary${periodId ? `?period_id=${periodId}` : ''}`),
+  getBudgetHistory: (months = 12) =>
+    request<import('../types').BudgetHistoryEntry[]>(`/budget/history?months=${months}`),
+
+  // Configuración editable
+  getSetting: (key: string) =>
+    request<{ key: string; value: string; updated_at: string; updated_by: number | null }>(`/settings/${key}`),
+  updateSetting: (key: string, value: string) =>
+    request<{ key: string; value: string; updated_at: string; updated_by: number | null }>(`/settings/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    }),
 
   // Comentarios (polimórficos)
   getComments: (entityType: 'family' | 'agreement', entityId: number) =>

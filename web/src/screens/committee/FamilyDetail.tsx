@@ -91,6 +91,12 @@ export default function FamilyDetail() {
   const [newStudentLevel, setNewStudentLevel] = useState<string>('primaria');
   const [newStudentGrade, setNewStudentGrade] = useState('');
   const [savingStudent, setSavingStudent] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState<number | null>(null);
+  const [editStudentName, setEditStudentName] = useState('');
+  const [editStudentLevel, setEditStudentLevel] = useState<string>('primaria');
+  const [editStudentGrade, setEditStudentGrade] = useState('');
+  const [editStudentFileNumber, setEditStudentFileNumber] = useState('');
+  const [savingStudentEdit, setSavingStudentEdit] = useState(false);
 
   const loadData = async () => {
     if (!id) return;
@@ -309,6 +315,42 @@ export default function FamilyDetail() {
       setSavingStudent(false);
       setLoading(false);
     }
+  };
+
+  const startEditingStudent = (student: Student) => {
+    setEditingStudentId(student.id);
+    setEditStudentName(student.name);
+    setEditStudentLevel(student.level);
+    setEditStudentGrade(student.grade);
+    setEditStudentFileNumber(student.file_number ?? '');
+  };
+
+  const saveStudent = async () => {
+    if (!family || !editingStudentId || !editStudentName.trim() || !editStudentGrade.trim()) return;
+    setSavingStudentEdit(true);
+    try {
+      await api.updateStudent(family.id, editingStudentId, {
+        name: editStudentName.trim(),
+        level: editStudentLevel,
+        grade: editStudentGrade.trim(),
+        file_number: editStudentFileNumber.trim(),
+      });
+      setEditingStudentId(null);
+      setLoading(true);
+      await loadData();
+    } finally {
+      setSavingStudentEdit(false);
+      setLoading(false);
+    }
+  };
+
+  const removeStudent = async (studentId: number) => {
+    if (!family) return;
+    if (!confirm('¿Eliminar este estudiante?')) return;
+    await api.deleteStudent(family.id, studentId);
+    setLoading(true);
+    await loadData();
+    setLoading(false);
   };
 
   const handleAddFamilyComment = async () => {
@@ -649,15 +691,95 @@ export default function FamilyDetail() {
               <th className="px-4 py-3 font-medium">Nivel</th>
               <th className="px-4 py-3 font-medium">Grado</th>
               <th className="px-4 py-3 font-medium">Legajo</th>
+              {can('canManageFamilies') && (
+                <th className="px-4 py-3 font-medium text-right">Acciones</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {family.students.map((s) => (
               <tr key={s.id} className="border-b border-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">{s.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{LEVEL_LABELS[s.level] ?? s.level}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{s.grade}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{s.file_number ?? '—'}</td>
+                {editingStudentId === s.id ? (
+                  <>
+                    <td className="px-4 py-3">
+                      <input
+                        value={editStudentName}
+                        onChange={(e) => setEditStudentName(e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={editStudentLevel}
+                        onChange={(e) => setEditStudentLevel(e.target.value)}
+                        className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      >
+                        <option value="jardin">Jardín</option>
+                        <option value="primaria">Primaria</option>
+                        <option value="secundaria">Secundaria</option>
+                        <option value="12vo">12vo</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        value={editStudentGrade}
+                        onChange={(e) => setEditStudentGrade(e.target.value)}
+                        className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        value={editStudentFileNumber}
+                        onChange={(e) => setEditStudentFileNumber(e.target.value)}
+                        className="w-28 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      />
+                    </td>
+                    {can('canManageFamilies') && (
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            onClick={saveStudent}
+                            disabled={savingStudentEdit || !editStudentName.trim() || !editStudentGrade.trim()}
+                            className="text-xs text-gray-700 hover:text-gray-900 disabled:opacity-50"
+                          >
+                            {savingStudentEdit ? '...' : 'Guardar'}
+                          </button>
+                          <button
+                            onClick={() => setEditingStudentId(null)}
+                            className="text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <td className="px-4 py-3 text-sm text-gray-900">{s.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{LEVEL_LABELS[s.level] ?? s.level}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{s.grade}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{s.file_number ?? '—'}</td>
+                    {can('canManageFamilies') && (
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex items-center gap-3">
+                          <button
+                            onClick={() => startEditingStudent(s)}
+                            className="text-xs text-gray-500 hover:text-gray-700"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => removeStudent(s.id)}
+                            className="text-xs text-red-400 hover:text-red-600"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </>
+                )}
               </tr>
             ))}
           </tbody>

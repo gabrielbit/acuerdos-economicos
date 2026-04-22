@@ -17,7 +17,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   solicitud: { label: 'Solicitud', className: 'bg-purple-50 text-purple-700' },
   formulario_enviado: { label: 'Form. enviado', className: 'bg-violet-50 text-violet-700' },
   formulario_completado: { label: 'Form. completado', className: 'bg-indigo-50 text-indigo-700' },
-  agendado: { label: 'Agendado', className: 'bg-blue-50 text-blue-700' },
+  agendado: { label: 'Entrevista', className: 'bg-blue-50 text-blue-700' },
   en_definicion: { label: 'En definición', className: 'bg-amber-50 text-amber-700' },
   otorgado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
   rechazado: { label: 'Rechazado', className: 'bg-red-50 text-red-700' },

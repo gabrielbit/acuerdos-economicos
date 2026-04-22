@@ -38,7 +38,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   solicitud: { label: 'Solicitud', className: 'bg-purple-50 text-purple-700' },
   formulario_enviado: { label: 'Form. enviado', className: 'bg-violet-50 text-violet-700' },
   formulario_completado: { label: 'Form. completado', className: 'bg-indigo-50 text-indigo-700' },
-  agendado: { label: 'Agendado', className: 'bg-blue-50 text-blue-700' },
+  agendado: { label: 'Entrevista', className: 'bg-blue-50 text-blue-700' },
   en_definicion: { label: 'En definición', className: 'bg-amber-50 text-amber-700' },
   otorgado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
   rechazado: { label: 'Rechazado', className: 'bg-red-50 text-red-700' },
@@ -450,7 +450,7 @@ export default function FamilyDetail() {
                     <option value="solicitud">Solicitud</option>
                     <option value="formulario_enviado">Form. enviado</option>
                     <option value="formulario_completado">Form. completado</option>
-                    <option value="agendado">Agendado</option>
+                    <option value="agendado">Entrevista</option>
                     <option value="en_definicion">En definición</option>
                     <option value="otorgado">Otorgado</option>
                     <option value="rechazado">Rechazado</option>
@@ -493,8 +493,7 @@ export default function FamilyDetail() {
       </div>
 
       {/* Entrevista */}
-      {(family.status === 'agendado' || family.interview_date) && (
-        <div className="bg-white rounded-xl border border-gray-200">
+      <div className="bg-white rounded-xl border border-gray-200">
           <div className="p-4 flex items-center gap-3">
             <span className="text-sm font-medium text-gray-900">Entrevista</span>
             {!editingInterview && family.interview_date ? (
@@ -613,7 +612,6 @@ export default function FamilyDetail() {
             );
           })()}
         </div>
-      )}
 
       {/* Invitación */}
       {can('canManageFamilies') && (

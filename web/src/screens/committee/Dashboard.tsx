@@ -44,7 +44,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   solicitud: { label: 'Solicitud', className: 'bg-purple-50 text-purple-700' },
   formulario_enviado: { label: 'Form. enviado', className: 'bg-violet-50 text-violet-700' },
   formulario_completado: { label: 'Form. completado', className: 'bg-indigo-50 text-indigo-700' },
-  agendado: { label: 'Agendado', className: 'bg-blue-50 text-blue-700' },
+  agendado: { label: 'Entrevista', className: 'bg-blue-50 text-blue-700' },
   en_definicion: { label: 'En definición', className: 'bg-amber-50 text-amber-700' },
   otorgado: { label: 'Otorgado', className: 'bg-green-50 text-green-700' },
   rechazado: { label: 'Rechazado', className: 'bg-red-50 text-red-700' },
@@ -145,39 +145,38 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Métricas de presupuesto */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-sm text-gray-500 mb-1">Presupuesto total</p>
-          <p className="text-2xl font-semibold text-gray-900">{formatMoney(budget.total_budget)}</p>
+          <p className="text-2xl font-semibold text-gray-900 tabular-nums">{formatMoney(budget.total_budget)}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-sm text-green-600 mb-1">Otorgado</p>
-          <p className="text-2xl font-semibold text-green-700">{formatMoney(budget.granted_assigned)}</p>
-          <p className="text-sm text-gray-500 mt-1">{budget.assigned_percentage.toFixed(0)}%</p>
-          <p className="text-xs text-gray-400 mt-1">{budget.families_assigned} familias</p>
+          <p className="text-2xl font-semibold text-green-700 tabular-nums">{formatMoney(budget.granted_assigned)}</p>
+          <p className="text-sm text-gray-500 mt-1 tabular-nums">{budget.assigned_percentage.toFixed(0)}%</p>
+          <p className="text-xs text-gray-400 mt-1 tabular-nums">{budget.families_assigned} familias</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-sm text-amber-600 mb-1">En definición</p>
-          <p className="text-2xl font-semibold text-amber-600">{formatMoney(budget.granted_in_definition)}</p>
-          <p className="text-sm text-gray-500 mt-1">{budget.in_definition_percentage.toFixed(0)}%</p>
-          <p className="text-xs text-gray-400 mt-1">{budget.families_in_definition} familias</p>
+          <p className="text-2xl font-semibold text-amber-600 tabular-nums">{formatMoney(budget.granted_in_definition)}</p>
+          <p className="text-sm text-gray-500 mt-1 tabular-nums">{budget.in_definition_percentage.toFixed(0)}%</p>
+          <p className="text-xs text-gray-400 mt-1 tabular-nums">{budget.families_in_definition} familias</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-sm text-gray-500 mb-1">Disponible</p>
-          <p className="text-2xl font-semibold text-gray-900">{formatMoney(budget.available)}</p>
-          <p className="text-sm text-gray-500 mt-1">{budget.available_percentage.toFixed(0)}%</p>
-          <p className="text-xs text-gray-400 mt-1">{budget.families_pending} familias</p>
+          <p className="text-2xl font-semibold text-gray-900 tabular-nums">{formatMoney(budget.available)}</p>
+          <p className="text-sm text-gray-500 mt-1 tabular-nums">{budget.available_percentage.toFixed(0)}%</p>
+          <p className="text-xs text-gray-400 mt-1 tabular-nums">{budget.families_pending} familias</p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-green-50 rounded-xl border border-green-100 p-4">
-          <p className="text-sm text-green-700">Familias con acuerdo otorgado</p>
-          <p className="text-2xl font-semibold text-green-800">{budget.families_assigned}</p>
-        </div>
-        <div className="bg-green-50 rounded-xl border border-green-100 p-4">
-          <p className="text-sm text-green-700">Alumnos impactados</p>
-          <p className="text-2xl font-semibold text-green-800">{budget.students_assigned}</p>
+        <div className="bg-green-50 rounded-xl border border-green-100 p-5 space-y-4">
+          <div>
+            <p className="text-sm text-green-700">Familias con acuerdo otorgado</p>
+            <p className="text-2xl font-semibold text-green-800 tabular-nums">{budget.families_assigned}</p>
+          </div>
+          <div className="pt-3 border-t border-green-200">
+            <p className="text-sm text-green-700">Alumnos impactados</p>
+            <p className="text-2xl font-semibold text-green-800 tabular-nums">{budget.students_assigned}</p>
+          </div>
         </div>
       </div>
 

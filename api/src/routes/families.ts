@@ -215,16 +215,29 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       return reply.status(404).send({ error: 'Familia no encontrada' });
     }
 
-    await fastify.db.query(
-      `UPDATE agreements
-       SET ended_at = CASE
-         WHEN $1::text = 'suspendido' THEN COALESCE(ended_at, NOW())
-         ELSE NULL
-       END
-       WHERE family_id = $2
-         AND period_id = (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1)`,
-      [data.status, id]
-    );
+    const endedAtColumn = await fastify.db.query<{ exists: boolean }>(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'agreements'
+          AND column_name = 'ended_at'
+      ) AS exists
+    `);
+
+    // Compatibilidad hacia atrás: en entornos sin la migración 012, evitar 500.
+    if (endedAtColumn.rows[0]?.exists) {
+      await fastify.db.query(
+        `UPDATE agreements
+         SET ended_at = CASE
+           WHEN $1::text = 'suspendido' THEN COALESCE(ended_at, NOW())
+           ELSE NULL
+         END
+         WHERE family_id = $2
+           AND period_id = (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1)`,
+        [data.status, id]
+      );
+    }
 
     return result.rows[0];
   });

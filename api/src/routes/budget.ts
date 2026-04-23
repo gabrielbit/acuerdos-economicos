@@ -119,6 +119,40 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
     const { months } = request.query as { months?: string };
     const monthsCount = Math.max(1, Math.min(120, Number(months ?? 12)));
 
+    const endedAtColumn = await fastify.db.query<{ exists: boolean }>(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'agreements'
+          AND column_name = 'ended_at'
+      ) AS exists
+    `);
+    const hasEndedAt = endedAtColumn.rows[0]?.exists === true;
+
+    const dropsCte = hasEndedAt
+      ? `
+      drops AS (
+        SELECT
+          date_trunc('month', a.ended_at) AS month_start,
+          COUNT(DISTINCT a.family_id)::int AS families_dropped,
+          COALESCE(SUM(ast.discount_amount), 0)::numeric AS amount_dropped
+        FROM agreements a
+        JOIN active_period ap ON ap.id = a.period_id
+        LEFT JOIN agreement_students ast ON ast.agreement_id = a.id
+        WHERE a.ended_at IS NOT NULL
+          AND a.ended_at >= (SELECT MIN(month_start) FROM month_series)
+        GROUP BY 1
+      )`
+      : `
+      drops AS (
+        SELECT
+          ms.month_start,
+          0::int AS families_dropped,
+          0::numeric AS amount_dropped
+        FROM month_series ms
+      )`;
+
     const result = await fastify.db.query(`
       WITH month_series AS (
         SELECT date_trunc('month', CURRENT_DATE) - (gs.i * INTERVAL '1 month') AS month_start
@@ -151,18 +185,7 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
           AND a.granted_at >= (SELECT MIN(month_start) FROM month_series)
         GROUP BY 1
       ),
-      drops AS (
-        SELECT
-          date_trunc('month', a.ended_at) AS month_start,
-          COUNT(DISTINCT a.family_id)::int AS families_dropped,
-          COALESCE(SUM(ast.discount_amount), 0)::numeric AS amount_dropped
-        FROM agreements a
-        JOIN active_period ap ON ap.id = a.period_id
-        LEFT JOIN agreement_students ast ON ast.agreement_id = a.id
-        WHERE a.ended_at IS NOT NULL
-          AND a.ended_at >= (SELECT MIN(month_start) FROM month_series)
-        GROUP BY 1
-      )
+      ${dropsCte}
       SELECT
         ms.month_start::date AS month_start,
         mb.total_budget,

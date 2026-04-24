@@ -112,7 +112,7 @@ export default function FamilyDetail() {
   const [editing, setEditing] = useState(false);
   const [editDiscount, setEditDiscount] = useState(0);
   const [editObs, setEditObs] = useState('');
-  const [editImpactStartMonth, setEditImpactStartMonth] = useState('2026-02');
+  const [editImpactStartMonth, setEditImpactStartMonth] = useState('2026-03');
   const [editImpactEndMonth, setEditImpactEndMonth] = useState('2026-08');
   const [saving, setSaving] = useState(false);
 
@@ -298,7 +298,7 @@ export default function FamilyDetail() {
     if (!agreement) return;
     setEditDiscount(Number(agreement.discount_percentage));
     setEditObs(agreement.observations ?? '');
-    setEditImpactStartMonth(dateToMonthInput(agreement.impact_starts_at, '2026-02'));
+    setEditImpactStartMonth(dateToMonthInput(agreement.impact_starts_at, '2026-03'));
     setEditImpactEndMonth(dateToMonthInput(agreement.expires_at, '2026-08'));
     setEditing(true);
   };

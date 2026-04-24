@@ -95,7 +95,7 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
           data.discount_percentage,
           data.observations,
           request.user.userId,
-          data.impact_starts_at ?? '2026-02-01',
+          data.impact_starts_at ?? '2026-03-01',
           data.expires_at ?? '2026-08-31',
         ]
       );

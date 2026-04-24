@@ -62,7 +62,7 @@ export default function AgreementForm() {
   const [activePeriod, setActivePeriod] = useState<AidPeriod | null>(null);
 
   const [discountInput, setDiscountInput] = useState('');
-  const [impactStartMonth, setImpactStartMonth] = useState('2026-02');
+  const [impactStartMonth, setImpactStartMonth] = useState('2026-03');
   const [impactEndMonth, setImpactEndMonth] = useState('2026-08');
   const [observations, setObservations] = useState('');
   const [saving, setSaving] = useState(false);

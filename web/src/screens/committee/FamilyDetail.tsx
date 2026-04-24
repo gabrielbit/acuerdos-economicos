@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
-import type { Family, Student, Agreement, AgreementStudent, Comment, MonthlySavingsEntry } from '../../types';
+import type { Family, Student, Agreement, Comment, MonthlySavingsEntry } from '../../types';
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('es-AR', {
@@ -66,6 +66,7 @@ export default function FamilyDetail() {
   const [editing, setEditing] = useState(false);
   const [editDiscount, setEditDiscount] = useState(0);
   const [editObs, setEditObs] = useState('');
+  const [editExpiresAt, setEditExpiresAt] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Invitación
@@ -249,6 +250,7 @@ export default function FamilyDetail() {
     if (!agreement) return;
     setEditDiscount(Number(agreement.discount_percentage));
     setEditObs(agreement.observations ?? '');
+    setEditExpiresAt(agreement.expires_at ? agreement.expires_at.slice(0, 10) : '2026-08-31');
     setEditing(true);
   };
 
@@ -259,6 +261,7 @@ export default function FamilyDetail() {
       await api.updateAgreement(agreement.id, {
         discount_percentage: editDiscount,
         observations: editObs || undefined,
+        expires_at: editExpiresAt || undefined,
       });
       setEditing(false);
       setLoading(true);
@@ -381,6 +384,9 @@ export default function FamilyDetail() {
   if (!family) return <p className="text-sm text-gray-500 py-8 text-center">Familia no encontrada.</p>;
 
   const status = STATUS_LABELS[family.status] ?? STATUS_LABELS.solicitud;
+  const agreementStudentsById = new Map(
+    (agreement?.students ?? []).map((as) => [as.student_id, as])
+  );
 
   return (
     <div className="space-y-6">
@@ -469,12 +475,6 @@ export default function FamilyDetail() {
                   <span className={`px-3 py-1 text-sm font-medium rounded-full ${status.className}`}>
                     {status.label}
                   </span>
-                )}
-                {!agreement && can('canManageAgreements') && (
-                  <Link to={`/familias/${family.id}/nuevo-acuerdo`}
-                    className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
-                    Crear acuerdo
-                  </Link>
                 )}
                 {can('canManageFamilies') && (
                   <button onClick={startEditingFamily}
@@ -649,17 +649,85 @@ export default function FamilyDetail() {
         </div>
       )}
 
-      {/* Tabla de hijos */}
+      {/* Estudiantes + acuerdo */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-gray-900">Estudiantes</h2>
-          {can('canManageFamilies') && (
-            <button onClick={() => setShowAddStudent(!showAddStudent)}
-              className="text-xs text-gray-500 hover:text-gray-700">
-              {showAddStudent ? 'Cancelar' : '+ Agregar'}
-            </button>
-          )}
+          <h2 className="text-sm font-medium text-gray-900">Estudiantes y acuerdo</h2>
+          <div className="flex items-center gap-3">
+            {agreement ? (
+              <>
+                <span className="px-3 py-1 text-sm font-semibold rounded-full bg-emerald-50 text-emerald-700">
+                  {agreement.discount_percentage}% de descuento
+                </span>
+                {!editing && can('canManageAgreements') && (
+                  <>
+                    <button onClick={startEditing} className="text-xs text-gray-400 hover:text-gray-600">Editar</button>
+                    <button onClick={async () => {
+                      if (!confirm('¿Eliminar este acuerdo? Esta acción no se puede deshacer.')) return;
+                      await api.deleteAgreement(agreement.id);
+                      setAgreement(null);
+                      setAgreementComments([]);
+                    }}
+                      className="text-xs text-red-400 hover:text-red-600">Borrar</button>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="text-xs text-gray-400">Sin acuerdo para este período</span>
+                {can('canManageAgreements') && (
+                  <Link to={`/familias/${family.id}/nuevo-acuerdo`}
+                    className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
+                    Crear acuerdo
+                  </Link>
+                )}
+              </>
+            )}
+            {can('canManageFamilies') && (
+              <button onClick={() => setShowAddStudent(!showAddStudent)}
+                className="text-xs text-gray-500 hover:text-gray-700">
+                {showAddStudent ? 'Cancelar' : '+ Agregar'}
+              </button>
+            )}
+          </div>
         </div>
+
+        {editing && agreement && (
+          <div className="p-4 border-b border-gray-100 bg-gray-50 space-y-4">
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">% Descuento</label>
+                <input type="number" min={0} max={100} value={editDiscount}
+                  onChange={(e) => setEditDiscount(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Caducidad</label>
+                <input type="date" value={editExpiresAt}
+                  onChange={(e) => setEditExpiresAt(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div className="col-span-2 flex items-end">
+                <div className="flex gap-2">
+                  <button onClick={saveAgreement} disabled={saving}
+                    className="px-3 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50">
+                    {saving ? 'Guardando...' : 'Guardar'}
+                  </button>
+                  <button onClick={() => setEditing(false)}
+                    className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Observaciones</label>
+              <textarea value={editObs} onChange={(e) => setEditObs(e.target.value)} rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" />
+            </div>
+          </div>
+        )}
+
         {showAddStudent && (
           <div className="p-4 border-b border-gray-100 bg-gray-50">
             <div className="flex gap-3 items-end">
@@ -691,10 +759,13 @@ export default function FamilyDetail() {
             </div>
           </div>
         )}
+
         <table className="w-full">
           <thead>
             <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-              <th className="px-4 py-3 font-medium">Nombre</th>
+              <th className="px-4 py-3 font-medium">Estudiante</th>
+              <th className="px-4 py-3 font-medium text-right">Cuota pura</th>
+              <th className="px-4 py-3 font-medium text-right">Descuento</th>
               <th className="px-4 py-3 font-medium">Nivel</th>
               <th className="px-4 py-3 font-medium">Grado</th>
               <th className="px-4 py-3 font-medium">Legajo</th>
@@ -704,193 +775,123 @@ export default function FamilyDetail() {
             </tr>
           </thead>
           <tbody>
-            {family.students.map((s) => (
-              <tr key={s.id} className="border-b border-gray-50">
-                {editingStudentId === s.id ? (
-                  <>
-                    <td className="px-4 py-3">
-                      <input
-                        value={editStudentName}
-                        onChange={(e) => setEditStudentName(e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={editStudentLevel}
-                        onChange={(e) => setEditStudentLevel(e.target.value)}
-                        className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      >
-                        <option value="jardin">Jardín</option>
-                        <option value="primaria">Primaria</option>
-                        <option value="secundaria">Secundaria</option>
-                        <option value="12vo">12vo</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        value={editStudentGrade}
-                        onChange={(e) => setEditStudentGrade(e.target.value)}
-                        className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        value={editStudentFileNumber}
-                        onChange={(e) => setEditStudentFileNumber(e.target.value)}
-                        className="w-28 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      />
-                    </td>
-                    {can('canManageFamilies') && (
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <button
-                            onClick={saveStudent}
-                            disabled={savingStudentEdit || !editStudentName.trim() || !editStudentGrade.trim()}
-                            className="text-xs text-gray-700 hover:text-gray-900 disabled:opacity-50"
-                          >
-                            {savingStudentEdit ? '...' : 'Guardar'}
-                          </button>
-                          <button
-                            onClick={() => setEditingStudentId(null)}
-                            className="text-xs text-gray-400 hover:text-gray-600"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
+            {family.students.map((s) => {
+              const agreementStudent = agreementStudentsById.get(s.id);
+              return (
+                <tr key={s.id} className="border-b border-gray-50">
+                  {editingStudentId === s.id ? (
+                    <>
+                      <td className="px-4 py-3">
+                        <input
+                          value={editStudentName}
+                          onChange={(e) => setEditStudentName(e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        />
                       </td>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <td className="px-4 py-3 text-sm text-gray-900">{s.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{LEVEL_LABELS[s.level] ?? s.level}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{s.grade}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{s.file_number ?? '—'}</td>
-                    {can('canManageFamilies') && (
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex items-center gap-3">
-                          <button
-                            onClick={() => startEditingStudent(s)}
-                            className="text-xs text-gray-500 hover:text-gray-700"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => removeStudent(s.id)}
-                            className="text-xs text-red-400 hover:text-red-600"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
+                      <td className="px-4 py-3 text-sm text-gray-500 text-right">—</td>
+                      <td className="px-4 py-3 text-sm text-gray-500 text-right">—</td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={editStudentLevel}
+                          onChange={(e) => setEditStudentLevel(e.target.value)}
+                          className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        >
+                          <option value="jardin">Jardín</option>
+                          <option value="primaria">Primaria</option>
+                          <option value="secundaria">Secundaria</option>
+                          <option value="12vo">12vo</option>
+                        </select>
                       </td>
-                    )}
-                  </>
-                )}
-              </tr>
-            ))}
+                      <td className="px-4 py-3">
+                        <input
+                          value={editStudentGrade}
+                          onChange={(e) => setEditStudentGrade(e.target.value)}
+                          className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          value={editStudentFileNumber}
+                          onChange={(e) => setEditStudentFileNumber(e.target.value)}
+                          className="w-28 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        />
+                      </td>
+                      {can('canManageFamilies') && (
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              onClick={saveStudent}
+                              disabled={savingStudentEdit || !editStudentName.trim() || !editStudentGrade.trim()}
+                              className="text-xs text-gray-700 hover:text-gray-900 disabled:opacity-50"
+                            >
+                              {savingStudentEdit ? '...' : 'Guardar'}
+                            </button>
+                            <button
+                              onClick={() => setEditingStudentId(null)}
+                              className="text-xs text-gray-400 hover:text-gray-600"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-4 py-3 text-sm text-gray-900">{s.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 text-right">
+                        {agreementStudent ? formatMoney(agreementStudent.base_tuition) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-red-600 text-right">
+                        {agreementStudent ? `-${formatMoney(agreementStudent.discount_amount)}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{LEVEL_LABELS[s.level] ?? s.level}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{s.grade}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{s.file_number ?? '—'}</td>
+                      {can('canManageFamilies') && (
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex items-center gap-3">
+                            <button
+                              onClick={() => startEditingStudent(s)}
+                              className="text-xs text-gray-500 hover:text-gray-700"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => removeStudent(s.id)}
+                              className="text-xs text-red-400 hover:text-red-600"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-      </div>
-
-      {/* Acuerdo actual */}
-      {agreement && (
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-gray-900">Acuerdo actual</h2>
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 text-sm font-semibold rounded-full bg-emerald-50 text-emerald-700">
-                {agreement.discount_percentage}% de descuento
-              </span>
-              {!editing && can('canManageAgreements') && (
-                <>
-                  <button onClick={startEditing}
-                    className="text-xs text-gray-400 hover:text-gray-600">Editar</button>
-                  <button onClick={async () => {
-                    if (!confirm('¿Eliminar este acuerdo? Esta acción no se puede deshacer.')) return;
-                    await api.deleteAgreement(agreement.id);
-                    setAgreement(null);
-                    setAgreementComments([]);
-                  }}
-                    className="text-xs text-red-400 hover:text-red-600">Borrar</button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {editing && (
-            <div className="p-4 border-b border-gray-100 bg-gray-50 space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">% Descuento</label>
-                  <input type="number" min={0} max={100} value={editDiscount}
-                    onChange={(e) => setEditDiscount(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-                </div>
-                <div className="flex items-end">
-                  <div className="flex gap-2">
-                    <button onClick={saveAgreement} disabled={saving}
-                      className="px-3 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50">
-                      {saving ? 'Guardando...' : 'Guardar'}
-                    </button>
-                    <button onClick={() => setEditing(false)}
-                      className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Observaciones</label>
-                <textarea value={editObs} onChange={(e) => setEditObs(e.target.value)} rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" />
-              </div>
-            </div>
-          )}
-
-          {agreement.students && agreement.students.length > 0 ? (
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-                  <th className="px-4 py-3 font-medium">Estudiante</th>
-                  <th className="px-4 py-3 font-medium text-right">Cuota pura</th>
-                  <th className="px-4 py-3 font-medium text-right">Descuento</th>
-                  <th className="px-4 py-3 font-medium text-right">Extras</th>
-                  <th className="px-4 py-3 font-medium text-right">A pagar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agreement.students.map((as: AgreementStudent) => (
-                  <tr key={as.id} className="border-b border-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">{as.student_name ?? LEVEL_LABELS[as.level]}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatMoney(as.base_tuition)}</td>
-                    <td className="px-4 py-3 text-sm text-red-600 text-right">-{formatMoney(as.discount_amount)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatMoney(as.extras)}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">{formatMoney(as.amount_to_pay)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin detalle por estudiante</p>
-          )}
-          {!editing && (agreement.observations || agreement.granted_at) && (
-            <div className="px-4 py-3 border-t border-gray-100 space-y-2">
+        {agreement && !editing && (agreement.observations || agreement.granted_at || agreement.expires_at) && (
+          <div className="px-4 py-3 border-t border-gray-100 space-y-2">
+            <div className="flex gap-6 text-xs text-gray-400">
               {agreement.granted_at && (
-                <div className="flex gap-6 text-xs text-gray-400">
-                  <span>Otorgado el {new Date(agreement.granted_at).toLocaleDateString('es-AR')}</span>
-                </div>
+                <span>Otorgado el {new Date(agreement.granted_at).toLocaleDateString('es-AR')}</span>
               )}
-              {agreement.observations && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Observaciones</p>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{agreement.observations}</p>
-                </div>
+              {agreement.expires_at && (
+                <span>Caduca el {new Date(agreement.expires_at).toLocaleDateString('es-AR')}</span>
               )}
             </div>
-          )}
-        </div>
-      )}
+            {agreement.observations && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Observaciones</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{agreement.observations}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Ahorro mensual */}
       {agreement && (

@@ -85,6 +85,7 @@ export interface Agreement {
   created_at: string;
   updated_at: string;
   granted_at: string | null;
+  expires_at: string | null;
   students?: AgreementStudent[];
   family?: Family;
 }

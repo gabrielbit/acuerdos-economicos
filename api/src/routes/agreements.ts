@@ -6,6 +6,7 @@ const createAgreementSchema = z.object({
   period_id: z.number().int().positive(),
   discount_percentage: z.number().min(0).max(100),
   observations: z.string().optional(),
+  expires_at: z.string().optional(),
 });
 
 export default async function agreementRoutes(fastify: FastifyInstance) {
@@ -84,8 +85,8 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
 
       // Crear acuerdo (sin campo status — el status vive en la familia)
       const agreementResult = await client.query(
-        `INSERT INTO agreements (family_id, period_id, discount_percentage, observations, approved_by, granted_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
+        `INSERT INTO agreements (family_id, period_id, discount_percentage, observations, approved_by, granted_at, expires_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), $6::date)
          RETURNING *`,
         [
           data.family_id,
@@ -93,6 +94,7 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
           data.discount_percentage,
           data.observations,
           request.user.userId,
+          data.expires_at ?? '2026-08-31',
         ]
       );
       const agreement = agreementResult.rows[0];
@@ -182,9 +184,10 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
         `UPDATE agreements SET
           discount_percentage = COALESCE($1, discount_percentage),
           observations = COALESCE($2, observations),
+          expires_at = COALESCE($3::date, expires_at),
           updated_at = NOW()
-        WHERE id = $3 RETURNING *`,
-        [data.discount_percentage, data.observations, id]
+        WHERE id = $4 RETURNING *`,
+        [data.discount_percentage, data.observations, data.expires_at, id]
       );
 
       // Si cambió el descuento, recalcular montos por estudiante

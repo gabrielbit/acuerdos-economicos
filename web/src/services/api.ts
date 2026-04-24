@@ -96,6 +96,7 @@ export const api = {
     period_id: number;
     discount_percentage: number;
     observations?: string;
+    expires_at?: string;
     status?: string;
   }) =>
     request<import('../types').Agreement>('/agreements', { method: 'POST', body: JSON.stringify(data) }),

@@ -7,6 +7,7 @@ const createFamilySchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional(),
   family_type: z.enum(['familia', 'docente']).optional(),
+  notes: z.string().nullable().optional(),
 });
 
 const createStudentSchema = z.object({
@@ -24,10 +25,20 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     preHandler: [fastify.requireCommittee],
   }, async (request) => {
     const { period_id } = request.query as { period_id?: string };
+    const notesColumnResult = await fastify.db.query(
+      `SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'families'
+          AND column_name = 'notes'
+      ) AS exists`
+    );
+    const notesSelect = notesColumnResult.rows[0]?.exists ? 'f.notes' : 'NULL::text AS notes';
 
     const result = await fastify.db.query(`
       SELECT
-        f.id, f.name, f.parent_names, f.email, f.phone, f.user_id, f.created_at,
+        f.id, f.name, f.parent_names, f.email, f.phone, ${notesSelect}, f.user_id, f.created_at,
         f.family_type::text AS family_type, f.status::text AS status, f.interview_date,
         COUNT(DISTINCT s.id)::int AS student_count,
         a.discount_percentage,
@@ -106,6 +117,23 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     const { id } = request.params as { id: string };
     const data = createFamilySchema.partial().parse(request.body);
 
+    if (data.notes !== undefined) {
+      const notesColumnResult = await fastify.db.query(
+        `SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'families'
+            AND column_name = 'notes'
+        ) AS exists`
+      );
+      if (!notesColumnResult.rows[0]?.exists) {
+        return reply.status(409).send({
+          error: 'Falta aplicar la migración 021_family_notes.sql para guardar observaciones generales',
+        });
+      }
+    }
+
     const fields: string[] = [];
     const values: unknown[] = [];
     let idx = 1;
@@ -148,6 +176,49 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     }).parse(request.body);
 
     if (data.status === 'otorgado') {
+      await fastify.db.query(`
+        WITH active_period AS (
+          SELECT id
+          FROM aid_periods
+          WHERE is_active = true
+          LIMIT 1
+        ),
+        active_schedule AS (
+          SELECT fs.id
+          FROM fee_schedules fs
+          WHERE fs.effective_from <= CURRENT_DATE
+          ORDER BY fs.effective_from DESC
+          LIMIT 1
+        ),
+        active_rate AS (
+          SELECT fsr.level, fsr.tuition_amount, fsr.extras_amount
+          FROM fee_schedule_rates fsr
+          JOIN active_schedule acs ON acs.id = fsr.fee_schedule_id
+        )
+        INSERT INTO agreement_students
+          (agreement_id, student_id, level, base_tuition, extras, discount_percentage, discount_amount, amount_to_pay)
+        SELECT
+          a.id,
+          s.id,
+          s.level,
+          ar.tuition_amount,
+          ar.extras_amount,
+          a.discount_percentage,
+          ROUND((ar.tuition_amount * a.discount_percentage / 100.0)::numeric, 2),
+          ROUND((ar.tuition_amount - (ar.tuition_amount * a.discount_percentage / 100.0) + ar.extras_amount)::numeric, 2)
+        FROM agreements a
+        JOIN active_period ap ON ap.id = a.period_id
+        JOIN students s ON s.family_id = a.family_id
+        JOIN active_rate ar ON ar.level = CASE WHEN s.grade = '12vo' THEN '12vo'::education_level ELSE s.level END
+        WHERE a.family_id = $1::int
+          AND NOT EXISTS (
+            SELECT 1
+            FROM agreement_students ast
+            WHERE ast.agreement_id = a.id
+              AND ast.student_id = s.id
+          )
+      `, [id]);
+
       const validation = await fastify.db.query(`
         WITH active_period AS (
           SELECT id
@@ -284,7 +355,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       from?: string; to?: string; period_id?: string;
     };
 
-    // Determinar rango de meses: por defecto, el período activo
+    // Determinar rango de meses: por defecto, el rango real del acuerdo.
     let fromDate: string;
     let toDate: string;
 
@@ -293,17 +364,50 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       toDate = `${to}-01`;
     } else {
       const periodResult = await fastify.db.query(`
-        SELECT start_month, end_month, year FROM aid_periods
-        WHERE id = COALESCE($1::int, (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1))
-      `, [period_id ?? null]);
+        SELECT
+          COALESCE(a.impact_starts_at, make_date(ap.year, ap.start_month, 1)) AS starts_at,
+          COALESCE(a.expires_at, make_date(ap.year, ap.end_month, 1)) AS ends_at
+        FROM agreements a
+        JOIN aid_periods ap ON ap.id = a.period_id
+        WHERE a.family_id = $1::int
+          AND a.period_id = COALESCE($2::int, (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1))
+        LIMIT 1
+      `, [id, period_id ?? null]);
 
       if (periodResult.rows.length === 0) {
-        return reply.status(404).send({ error: 'No hay período activo' });
+        return [];
       }
       const p = periodResult.rows[0];
-      fromDate = `${p.year}-${String(p.start_month).padStart(2, '0')}-01`;
-      toDate = `${p.year}-${String(p.end_month).padStart(2, '0')}-01`;
+      fromDate = p.starts_at.toISOString().slice(0, 10);
+      toDate = `${p.ends_at.toISOString().slice(0, 7)}-01`;
     }
+
+    const discountHistoryResult = await fastify.db.query(
+      `SELECT to_regclass('public.agreement_discount_changes') IS NOT NULL AS exists`
+    );
+    const hasDiscountHistory = Boolean(discountHistoryResult.rows[0]?.exists);
+    const monthlyDiscountCte = hasDiscountHistory
+      ? `
+      monthly_discount AS (
+        SELECT
+          m.month_start,
+          COALESCE((
+            SELECT adc.discount_percentage
+            FROM agreement_discount_changes adc
+            JOIN agreement a ON a.id = adc.agreement_id
+            WHERE adc.effective_from <= m.month_start
+            ORDER BY adc.effective_from DESC, adc.created_at DESC
+            LIMIT 1
+          ), (SELECT discount_percentage FROM agreement))::numeric AS discount_percentage
+        FROM months m
+      )`
+      : `
+      monthly_discount AS (
+        SELECT
+          m.month_start,
+          (SELECT discount_percentage FROM agreement)::numeric AS discount_percentage
+        FROM months m
+      )`;
 
     const result = await fastify.db.query(`
       WITH months AS (
@@ -315,7 +419,15 @@ export default async function familyRoutes(fastify: FastifyInstance) {
         FROM months m
         JOIN fee_schedules fs ON fs.effective_from <= m.month_start
         ORDER BY m.month_start, fs.effective_from DESC
-      )
+      ),
+      agreement AS (
+        SELECT a.*
+        FROM agreements a
+        WHERE a.family_id = $1::int
+          AND a.period_id = COALESCE($4::int, (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1))
+        LIMIT 1
+      ),
+      ${monthlyDiscountCte}
       SELECT
         ms.month_start,
         ms.schedule_name,
@@ -324,14 +436,15 @@ export default async function familyRoutes(fastify: FastifyInstance) {
         s.level,
         fsr.tuition_amount,
         fsr.extras_amount,
-        a.discount_percentage,
-        ROUND(fsr.tuition_amount * a.discount_percentage / 100, 2) AS savings,
-        ROUND(fsr.tuition_amount - fsr.tuition_amount * a.discount_percentage / 100 + fsr.extras_amount, 2) AS to_pay
+        md.discount_percentage,
+        ROUND(fsr.tuition_amount * md.discount_percentage / 100, 2) AS savings,
+        ROUND(fsr.tuition_amount - fsr.tuition_amount * md.discount_percentage / 100 + fsr.extras_amount, 2) AS to_pay
       FROM month_schedules ms
-      JOIN agreements a ON a.family_id = $1::int
-        AND a.period_id = COALESCE($4::int, (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1))
+      JOIN agreement a ON true
+      JOIN monthly_discount md ON md.month_start = ms.month_start
       JOIN students s ON s.family_id = $1::int
-      JOIN fee_schedule_rates fsr ON fsr.fee_schedule_id = ms.schedule_id AND fsr.level = s.level
+      JOIN fee_schedule_rates fsr ON fsr.fee_schedule_id = ms.schedule_id
+        AND fsr.level = CASE WHEN s.grade = '12vo' THEN '12vo'::education_level ELSE s.level END
       ORDER BY ms.month_start, s.name
     `, [id, fromDate, toDate, period_id ?? null]);
 
@@ -390,13 +503,64 @@ export default async function familyRoutes(fastify: FastifyInstance) {
   }, async (request) => {
     const { id } = request.params as { id: string };
     const data = createStudentSchema.parse(request.body);
-    const result = await fastify.db.query(
-      `INSERT INTO students (family_id, name, level, grade, file_number)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [id, data.name, data.level, data.grade, data.file_number]
-    );
-    return result.rows[0];
+    const client = await fastify.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query(
+        `INSERT INTO students (family_id, name, level, grade, file_number)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [id, data.name, data.level, data.grade, data.file_number]
+      );
+      const student = result.rows[0];
+
+      await client.query(`
+        WITH active_schedule AS (
+          SELECT fs.id
+          FROM fee_schedules fs
+          WHERE fs.effective_from <= CURRENT_DATE
+          ORDER BY fs.effective_from DESC
+          LIMIT 1
+        ),
+        active_rate AS (
+          SELECT fsr.level, fsr.tuition_amount, fsr.extras_amount
+          FROM fee_schedule_rates fsr
+          JOIN active_schedule acs ON acs.id = fsr.fee_schedule_id
+        ),
+        active_period AS (
+          SELECT id FROM aid_periods WHERE is_active = true LIMIT 1
+        )
+        INSERT INTO agreement_students
+          (agreement_id, student_id, level, base_tuition, extras, discount_percentage, discount_amount, amount_to_pay)
+        SELECT
+          a.id,
+          $2::int,
+          $3::education_level,
+          ar.tuition_amount,
+          ar.extras_amount,
+          a.discount_percentage,
+          ROUND((ar.tuition_amount * a.discount_percentage / 100.0)::numeric, 2),
+          ROUND((ar.tuition_amount - (ar.tuition_amount * a.discount_percentage / 100.0) + ar.extras_amount)::numeric, 2)
+        FROM agreements a
+        JOIN active_period ap ON ap.id = a.period_id
+        JOIN active_rate ar ON ar.level = CASE WHEN $4::text = '12vo' THEN '12vo'::education_level ELSE $3::education_level END
+        WHERE a.family_id = $1::int
+          AND NOT EXISTS (
+            SELECT 1 FROM agreement_students ast
+            WHERE ast.agreement_id = a.id AND ast.student_id = $2::int
+          )
+      `, [id, student.id, data.level, data.grade]);
+
+      await client.query('COMMIT');
+      return student;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   });
 
   // Actualizar estudiante
@@ -457,7 +621,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
         discount_amount = ROUND((ar.tuition_amount * ast.discount_percentage / 100.0)::numeric, 2),
         amount_to_pay = ROUND((ar.tuition_amount - (ar.tuition_amount * ast.discount_percentage / 100.0) + ar.extras_amount)::numeric, 2)
       FROM students s
-      JOIN active_rate ar ON ar.level = s.level
+      JOIN active_rate ar ON ar.level = CASE WHEN s.grade = '12vo' THEN '12vo'::education_level ELSE s.level END
       WHERE ast.student_id = s.id
         AND s.id = $1::int
     `, [studentId]);

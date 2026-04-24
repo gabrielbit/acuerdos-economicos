@@ -8,18 +8,20 @@ interface NewStudent {
   grade: string;
 }
 
-const GRADE_OPTIONS = [
-  { value: 'Jardin', label: 'Jardín' },
-  ...Array.from({ length: 7 }, (_, i) => {
+const GRADE_OPTIONS_BY_LEVEL: Record<string, Array<{ value: string; label: string }>> = {
+  jardin: [{ value: 'Jardin', label: 'Jardín' }],
+  primaria: Array.from({ length: 7 }, (_, i) => {
     const n = i + 1;
     return { value: `EP ${n}`, label: `EP ${n}` };
   }),
-  { value: '8vo', label: '8vo' },
-  { value: '9no', label: '9no' },
-  { value: '10mo', label: '10mo' },
-  { value: '11vo', label: '11vo' },
-  { value: '12vo', label: '12vo' },
-];
+  secundaria: [
+    { value: '8vo', label: '8vo' },
+    { value: '9no', label: '9no' },
+    { value: '10mo', label: '10mo' },
+    { value: '11vo', label: '11vo' },
+    { value: '12vo', label: '12vo' },
+  ],
+};
 
 export default function FamilyNew() {
   const navigate = useNavigate();
@@ -33,7 +35,10 @@ export default function FamilyNew() {
   const [error, setError] = useState('');
 
   const updateStudent = (index: number, field: keyof NewStudent, value: string) => {
-    setStudents((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+    setStudents((prev) => prev.map((s, i) => {
+      if (i !== index) return s;
+      return field === 'level' ? { ...s, level: value, grade: '' } : { ...s, [field]: value };
+    }));
   };
 
   const addStudentRow = () => {
@@ -156,7 +161,6 @@ export default function FamilyNew() {
                     <option value="jardin">Jardín</option>
                     <option value="primaria">Primaria</option>
                     <option value="secundaria">Secundaria</option>
-                    <option value="12vo">12vo</option>
                   </select>
                 </div>
                 <div>
@@ -167,7 +171,7 @@ export default function FamilyNew() {
                     className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                   >
                     <option value="">Seleccionar</option>
-                    {GRADE_OPTIONS.map((g) => (
+                    {(GRADE_OPTIONS_BY_LEVEL[s.level] ?? []).map((g) => (
                       <option key={g.value} value={g.value}>{g.label}</option>
                     ))}
                   </select>

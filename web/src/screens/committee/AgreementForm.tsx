@@ -16,7 +16,6 @@ const LEVEL_LABELS: Record<string, string> = {
   jardin: 'Jardín',
   primaria: 'Primaria',
   secundaria: 'Secundaria',
-  '12vo': '12vo',
 };
 
 const MONTH_NAMES = [
@@ -42,6 +41,14 @@ function monthToEndDate(month: string): string {
   const [year, monthNumber] = month.split('-').map(Number);
   const lastDay = new Date(year, monthNumber, 0).getDate();
   return `${month}-${String(lastDay).padStart(2, '0')}`;
+}
+
+function normalizedStudentLevel(level: string): string {
+  return level === '12vo' ? 'secundaria' : level;
+}
+
+function billingLevelForStudent(student: Student): string {
+  return student.grade === '12vo' ? '12vo' : normalizedStudentLevel(student.level);
 }
 
 interface StudentPreview {
@@ -89,7 +96,7 @@ export default function AgreementForm() {
   const ratesByLevel = new Map(rates.map((r) => [r.level, r]));
 
   const previews: StudentPreview[] = students.map((s) => {
-    const rate = ratesByLevel.get(s.level);
+    const rate = ratesByLevel.get(billingLevelForStudent(s));
     const baseTuition = rate ? Number(rate.tuition_amount) : 0;
     const extras = rate ? Number(rate.extras_amount) : 0;
     const discountAmount = baseTuition * (discount / 100);
@@ -115,6 +122,7 @@ export default function AgreementForm() {
         discount_percentage: discount,
         impact_starts_at: monthToStartDate(impactStartMonth),
         expires_at: monthToEndDate(impactEndMonth),
+        discount_effective_from: monthToStartDate(impactStartMonth),
         observations: observations || undefined,
       });
       navigate(`/familias/${familyId}`);
@@ -208,7 +216,9 @@ export default function AgreementForm() {
               {previews.map((p) => (
                 <tr key={p.student.id} className="border-b border-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-900">{p.student.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{LEVEL_LABELS[p.student.level]}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {LEVEL_LABELS[normalizedStudentLevel(p.student.level)]}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatMoney(p.baseTuition)}</td>
                   <td className="px-4 py-3 text-sm text-red-600 text-right">-{formatMoney(p.discountAmount)}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatMoney(p.extras)}</td>

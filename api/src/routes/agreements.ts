@@ -8,6 +8,7 @@ const createAgreementSchema = z.object({
   observations: z.string().optional(),
   impact_starts_at: z.string().optional(),
   expires_at: z.string().optional(),
+  discount_effective_from: z.string().optional(),
 });
 
 export default async function agreementRoutes(fastify: FastifyInstance) {
@@ -101,6 +102,25 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
       );
       const agreement = agreementResult.rows[0];
 
+      const discountHistoryResult = await client.query(
+        `SELECT to_regclass('public.agreement_discount_changes') IS NOT NULL AS exists`
+      );
+      if (discountHistoryResult.rows[0]?.exists) {
+        await client.query(
+          `INSERT INTO agreement_discount_changes
+           (agreement_id, effective_from, discount_percentage, changed_by)
+           VALUES ($1, $2::date, $3, $4)
+           ON CONFLICT (agreement_id, effective_from)
+           DO UPDATE SET discount_percentage = EXCLUDED.discount_percentage, changed_by = EXCLUDED.changed_by`,
+          [
+            agreement.id,
+            data.discount_effective_from ?? data.impact_starts_at ?? '2026-03-01',
+            data.discount_percentage,
+            request.user.userId,
+          ]
+        );
+      }
+
       // Obtener estudiantes de la familia y cuotas del período
       const studentsResult = await client.query(
         'SELECT * FROM students WHERE family_id = $1', [data.family_id]
@@ -122,7 +142,8 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
 
       // Crear detalle por estudiante
       for (const student of studentsResult.rows) {
-        const rate = ratesByLevel.get(student.level) as { tuition_amount: number; extras_amount: number } | undefined;
+        const billingLevel = student.grade === '12vo' ? '12vo' : student.level;
+        const rate = ratesByLevel.get(billingLevel) as { tuition_amount: number; extras_amount: number } | undefined;
         if (!rate) continue;
 
         const baseTuition = Number(rate.tuition_amount);
@@ -193,8 +214,27 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
         [data.discount_percentage, data.observations, data.impact_starts_at, data.expires_at, id]
       );
 
-      // Si cambió el descuento, recalcular montos por estudiante
+      // Si cambió el descuento, guardar el mes de impacto y recalcular el snapshot vigente.
       if (data.discount_percentage !== undefined && data.discount_percentage !== Number(old.discount_percentage)) {
+        const discountHistoryResult = await client.query(
+          `SELECT to_regclass('public.agreement_discount_changes') IS NOT NULL AS exists`
+        );
+        if (discountHistoryResult.rows[0]?.exists) {
+          await client.query(
+            `INSERT INTO agreement_discount_changes
+             (agreement_id, effective_from, discount_percentage, changed_by)
+             VALUES ($1, $2::date, $3, $4)
+             ON CONFLICT (agreement_id, effective_from)
+             DO UPDATE SET discount_percentage = EXCLUDED.discount_percentage, changed_by = EXCLUDED.changed_by`,
+            [
+              id,
+              data.discount_effective_from ?? data.impact_starts_at ?? old.impact_starts_at ?? '2026-03-01',
+              data.discount_percentage,
+              request.user.userId,
+            ]
+          );
+        }
+
         // Obtener rates del tarifario vigente
         const ratesResult = await client.query(`
           SELECT fsr.* FROM fee_schedule_rates fsr
@@ -209,12 +249,13 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
         const ratesByLevel = new Map(activeRates.map((r: { level: string }) => [r.level, r]));
 
         const studentsResult = await client.query(
-          'SELECT ast.*, s.level as student_level FROM agreement_students ast JOIN students s ON s.id = ast.student_id WHERE ast.agreement_id = $1',
+          'SELECT ast.*, s.level as student_level, s.grade as student_grade FROM agreement_students ast JOIN students s ON s.id = ast.student_id WHERE ast.agreement_id = $1',
           [id]
         );
 
         for (const as of studentsResult.rows) {
-          const rate = ratesByLevel.get(as.student_level) as { tuition_amount: number; extras_amount: number } | undefined;
+          const billingLevel = as.student_grade === '12vo' ? '12vo' : as.student_level;
+          const rate = ratesByLevel.get(billingLevel) as { tuition_amount: number; extras_amount: number } | undefined;
           if (!rate) continue;
 
           const baseTuition = Number(rate.tuition_amount);

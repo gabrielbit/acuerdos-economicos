@@ -33,6 +33,7 @@ export interface Family {
   parent_names: string | null;
   email: string | null;
   phone: string | null;
+  notes: string | null;
   address: string | null;
   locality: string | null;
   postal_code: string | null;
@@ -87,6 +88,7 @@ export interface Agreement {
   granted_at: string | null;
   impact_starts_at: string | null;
   expires_at: string | null;
+  discount_effective_from?: string | null;
   students?: AgreementStudent[];
   family?: Family;
 }

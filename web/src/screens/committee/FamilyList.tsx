@@ -189,7 +189,7 @@ export default function FamilyList() {
             ? new Date(agreement.expires_at).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })
             : 'Actual'}`
           : 'Actual';
-        const observations = agreement?.observations?.trim();
+        const observations = family.notes?.trim();
 
         const studentRows = students.map((student, index) => {
           const agreementStudent = agreementStudents.get(student.id);
@@ -373,7 +373,7 @@ export default function FamilyList() {
                     <th class="money">%</th>
                     <th class="money">Ayuda económica</th>
                     <th class="money">Total Familia</th>
-                    <th>Observaciones</th>
+                    <th>Observaciones generales</th>
                   </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>

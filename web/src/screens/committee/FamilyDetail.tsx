@@ -49,7 +49,6 @@ const LEVEL_LABELS: Record<string, string> = {
   jardin: 'Jardín',
   primaria: 'Primaria',
   secundaria: 'Secundaria',
-  '12vo': '12vo',
 };
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
@@ -78,30 +77,38 @@ const AGREEMENT_MONTH_OPTIONS = Array.from({ length: 24 }, (_, i) => {
   };
 });
 
-const GRADE_OPTIONS = [
-  { value: 'Jardin', label: 'Jardín' },
-  ...Array.from({ length: 7 }, (_, i) => {
+const GRADE_OPTIONS_BY_LEVEL: Record<string, Array<{ value: string; label: string }>> = {
+  jardin: [{ value: 'Jardin', label: 'Jardín' }],
+  primaria: Array.from({ length: 7 }, (_, i) => {
     const n = i + 1;
     return { value: `EP ${n}`, label: `EP ${n}` };
   }),
-  { value: '8vo', label: '8vo' },
-  { value: '9no', label: '9no' },
-  { value: '10mo', label: '10mo' },
-  { value: '11vo', label: '11vo' },
-  { value: '12vo', label: '12vo' },
-];
+  secundaria: [
+    { value: '8vo', label: '8vo' },
+    { value: '9no', label: '9no' },
+    { value: '10mo', label: '10mo' },
+    { value: '11vo', label: '11vo' },
+    { value: '12vo', label: '12vo' },
+  ],
+};
+
+function normalizedStudentLevel(level: string): string {
+  return level === '12vo' ? 'secundaria' : level;
+}
 
 export default function FamilyDetail() {
   const { can } = useAuth();
   const { id } = useParams<{ id: string }>();
   const [family, setFamily] = useState<(Family & { students: Student[] }) | null>(null);
   const [agreement, setAgreement] = useState<Agreement | null>(null);
-  const [familyComments, setFamilyComments] = useState<Comment[]>([]);
   const [agreementComments, setAgreementComments] = useState<Comment[]>([]);
-  const [newFamilyComment, setNewFamilyComment] = useState('');
   const [newAgreementComment, setNewAgreementComment] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [familyNotes, setFamilyNotes] = useState('');
+  const [savingFamilyNotes, setSavingFamilyNotes] = useState(false);
+  const [familyNotesError, setFamilyNotesError] = useState('');
+  const [statusError, setStatusError] = useState('');
 
   // Ahorro mensual
   const [monthlySavings, setMonthlySavings] = useState<MonthlySavingsEntry[]>([]);
@@ -114,6 +121,7 @@ export default function FamilyDetail() {
   const [editObs, setEditObs] = useState('');
   const [editImpactStartMonth, setEditImpactStartMonth] = useState('2026-03');
   const [editImpactEndMonth, setEditImpactEndMonth] = useState('2026-08');
+  const [editDiscountEffectiveMonth, setEditDiscountEffectiveMonth] = useState('2026-03');
   const [saving, setSaving] = useState(false);
 
   // Invitación
@@ -150,20 +158,24 @@ export default function FamilyDetail() {
   const loadData = async () => {
     if (!id) return;
     const familyId = Number(id);
-    const [f, agreements, fc] = await Promise.all([
+    const [f, agreements] = await Promise.all([
       api.getFamily(familyId),
       api.getAgreements(),
-      api.getComments('family', familyId),
     ]);
     const a = agreements.find((a) => a.family_id === familyId) ?? null;
     setFamily(f);
     setAgreement(a);
-    setFamilyComments(fc);
+    setFamilyNotes(f.notes ?? '');
     if (a) {
-      const ac = await api.getComments('agreement', a.id);
+      const [ac, savings] = await Promise.all([
+        api.getComments('agreement', a.id),
+        api.getMonthlySavings(familyId),
+      ]);
       setAgreementComments(ac);
+      setMonthlySavings(savings);
     } else {
       setAgreementComments([]);
+      setMonthlySavings([]);
     }
   };
 
@@ -300,6 +312,7 @@ export default function FamilyDetail() {
     setEditObs(agreement.observations ?? '');
     setEditImpactStartMonth(dateToMonthInput(agreement.impact_starts_at, '2026-03'));
     setEditImpactEndMonth(dateToMonthInput(agreement.expires_at, '2026-08'));
+    setEditDiscountEffectiveMonth(dateToMonthInput(agreement.impact_starts_at, '2026-03'));
     setEditing(true);
   };
 
@@ -312,6 +325,7 @@ export default function FamilyDetail() {
         observations: editObs || undefined,
         impact_starts_at: monthToStartDate(editImpactStartMonth),
         expires_at: monthToEndDate(editImpactEndMonth),
+        discount_effective_from: monthToStartDate(editDiscountEffectiveMonth),
       });
       setEditing(false);
       setLoading(true);
@@ -375,7 +389,7 @@ export default function FamilyDetail() {
   const startEditingStudent = (student: Student) => {
     setEditingStudentId(student.id);
     setEditStudentName(student.name);
-    setEditStudentLevel(student.level);
+    setEditStudentLevel(normalizedStudentLevel(student.level));
     setEditStudentGrade(student.grade);
     setEditStudentFileNumber(student.file_number ?? '');
   };
@@ -408,15 +422,19 @@ export default function FamilyDetail() {
     setLoading(false);
   };
 
-  const handleAddFamilyComment = async () => {
-    if (!newFamilyComment.trim() || !family) return;
-    setSendingComment(true);
+  const saveFamilyNotes = async () => {
+    if (!family) return;
+    setSavingFamilyNotes(true);
+    setFamilyNotesError('');
     try {
-      const comment = await api.addComment('family', family.id, newFamilyComment.trim());
-      setFamilyComments((prev) => [comment, ...prev]);
-      setNewFamilyComment('');
+      const notes = familyNotes.trim() || null;
+      const updated = await api.updateFamily(family.id, { notes });
+      setFamily((prev) => prev ? { ...prev, notes: updated.notes } : prev);
+      setFamilyNotes(updated.notes ?? '');
+    } catch (err) {
+      setFamilyNotesError(err instanceof Error ? err.message : 'No se pudieron guardar las observaciones');
     } finally {
-      setSendingComment(false);
+      setSavingFamilyNotes(false);
     }
   };
 
@@ -436,10 +454,14 @@ export default function FamilyDetail() {
   if (!family) return <p className="text-sm text-gray-500 py-8 text-center">Familia no encontrada.</p>;
 
   const status = STATUS_LABELS[family.status] ?? STATUS_LABELS.solicitud;
-  const showFamilyNotes = false;
   const agreementStudentsById = new Map(
     (agreement?.students ?? []).map((as) => [as.student_id, as])
   );
+  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  const totalAgreementSavings = monthlySavings.reduce((sum, entry) => sum + entry.total_savings, 0);
+  const savingsUntilToday = monthlySavings
+    .filter((entry) => entry.month <= currentMonthKey)
+    .reduce((sum, entry) => sum + entry.total_savings, 0);
 
   return (
     <div className="space-y-6">
@@ -534,10 +556,16 @@ export default function FamilyDetail() {
                   <select
                     value={family.status}
                     onChange={async (e) => {
-                      await api.updateFamilyStatus(family.id, e.target.value);
-                      setLoading(true);
-                      await loadData();
-                      setLoading(false);
+                      setStatusError('');
+                      try {
+                        await api.updateFamilyStatus(family.id, e.target.value);
+                        setLoading(true);
+                        await loadData();
+                      } catch (err) {
+                        setStatusError(err instanceof Error ? err.message : 'No se pudo cambiar el estado');
+                      } finally {
+                        setLoading(false);
+                      }
                     }}
                     className={`px-3 py-1 text-sm font-medium rounded-full border-0 cursor-pointer appearance-none pr-6 ${status.className}`}
                     style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
@@ -555,6 +583,9 @@ export default function FamilyDetail() {
                   <span className={`px-3 py-1 text-sm font-medium rounded-full ${status.className}`}>
                     {status.label}
                   </span>
+                )}
+                {statusError && (
+                  <p className="text-xs text-red-600 max-w-64">{statusError}</p>
                 )}
                 {can('canManageFamilies') && (
                   <button onClick={startEditingFamily}
@@ -731,29 +762,30 @@ export default function FamilyDetail() {
         )}
       </div>
 
-      {/* Estudiantes + acuerdo */}
+      {/* Acuerdo */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-gray-900">Estudiantes y acuerdo</h2>
+          <div>
+            <h2 className="text-sm font-medium text-gray-900">Acuerdo</h2>
+            <p className="text-xs text-gray-400 mt-1">
+              Condiciones generales y vigencia del beneficio
+            </p>
+          </div>
           <div className="flex items-center gap-3">
             {agreement ? (
-              <>
-                <span className="px-3 py-1 text-sm font-semibold rounded-full bg-emerald-50 text-emerald-700">
-                  {agreement.discount_percentage}% de descuento
-                </span>
-                {!editing && can('canManageAgreements') && (
-                  <>
-                    <button onClick={startEditing} className="text-xs text-gray-400 hover:text-gray-600">Editar</button>
-                    <button onClick={async () => {
-                      if (!confirm('¿Eliminar este acuerdo? Esta acción no se puede deshacer.')) return;
-                      await api.deleteAgreement(agreement.id);
-                      setAgreement(null);
-                      setAgreementComments([]);
-                    }}
-                      className="text-xs text-red-400 hover:text-red-600">Borrar</button>
-                  </>
-                )}
-              </>
+              !editing && can('canManageAgreements') && (
+                <>
+                  <button onClick={startEditing} className="text-xs text-gray-500 hover:text-gray-700">Editar acuerdo</button>
+                  <button onClick={async () => {
+                    if (!confirm('¿Eliminar este acuerdo? Esta acción no se puede deshacer.')) return;
+                    await api.deleteAgreement(agreement.id);
+                    setAgreement(null);
+                    setAgreementComments([]);
+                    setMonthlySavings([]);
+                  }}
+                    className="text-xs text-red-400 hover:text-red-600">Borrar acuerdo</button>
+                </>
+              )
             ) : (
               <>
                 <span className="text-xs text-gray-400">Sin acuerdo para este período</span>
@@ -765,23 +797,27 @@ export default function FamilyDetail() {
                 )}
               </>
             )}
-            {can('canManageFamilies') && (
-              <button onClick={() => setShowAddStudent(!showAddStudent)}
-                className="text-xs text-gray-500 hover:text-gray-700">
-                {showAddStudent ? 'Cancelar' : '+ Agregar'}
-              </button>
-            )}
           </div>
         </div>
 
-        {editing && agreement && (
-          <div className="p-4 border-b border-gray-100 bg-gray-50 space-y-4">
-            <div className="grid grid-cols-4 gap-4">
+        {editing && agreement ? (
+          <div className="p-4 bg-gray-50 space-y-4">
+            <div className="grid grid-cols-5 gap-4">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">% Descuento</label>
                 <input type="number" min={0} max={100} value={editDiscount}
                   onChange={(e) => setEditDiscount(Number(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Nuevo % desde</label>
+                <select value={editDiscountEffectiveMonth}
+                  onChange={(e) => setEditDiscountEffectiveMonth(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                  {AGREEMENT_MONTH_OPTIONS.map((month) => (
+                    <option key={month.value} value={month.value}>{month.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Impacta desde</label>
@@ -805,7 +841,7 @@ export default function FamilyDetail() {
               </div>
               <div className="flex items-end">
                 <div className="flex gap-2">
-                  <button onClick={saveAgreement} disabled={saving || !editImpactStartMonth || !editImpactEndMonth}
+                  <button onClick={saveAgreement} disabled={saving || !editImpactStartMonth || !editImpactEndMonth || !editDiscountEffectiveMonth}
                     className="px-3 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50">
                     {saving ? 'Guardando...' : 'Guardar'}
                   </button>
@@ -817,12 +853,67 @@ export default function FamilyDetail() {
               </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Observaciones</label>
+              <label className="block text-xs text-gray-500 mb-1">Observaciones del acuerdo</label>
               <textarea value={editObs} onChange={(e) => setEditObs(e.target.value)} rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" />
             </div>
           </div>
+        ) : agreement ? (
+          <div className="p-4">
+            <div className="grid grid-cols-4 gap-3">
+              <div className="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-3">
+                <p className="text-xs text-emerald-700 mb-1">Descuento</p>
+                <p className="text-sm font-semibold text-emerald-800">
+                  {Number(agreement.discount_percentage).toFixed(2)}%
+                </p>
+              </div>
+              <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-3">
+                <p className="text-xs text-gray-400 mb-1">Otorgado</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {agreement.granted_at ? new Date(agreement.granted_at).toLocaleDateString('es-AR') : 'Sin fecha'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-3">
+                <p className="text-xs text-gray-400 mb-1">Impacta desde</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {agreement.impact_starts_at ? formatMonthYear(agreement.impact_starts_at) : 'Sin definir'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-3">
+                <p className="text-xs text-gray-400 mb-1">Vigente hasta</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {agreement.expires_at ? formatMonthYear(agreement.expires_at) : 'Sin definir'}
+                </p>
+              </div>
+            </div>
+            {agreement.observations && (
+              <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50 px-3 py-3">
+                <p className="text-xs text-amber-700 mb-1">Observaciones del acuerdo</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{agreement.observations}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="px-4 py-6 text-sm text-gray-400">Todavía no se cargó un acuerdo para esta familia.</p>
         )}
+      </div>
+
+      {/* Estudiantes */}
+      <div className="bg-white rounded-xl border border-gray-200">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-medium text-gray-900">Estudiantes</h2>
+            <p className="text-xs text-gray-400 mt-1">Impacto del descuento aplicado a cada estudiante</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {can('canManageFamilies') && (
+              <button onClick={() => setShowAddStudent(!showAddStudent)}
+                className="text-xs text-gray-500 hover:text-gray-700">
+                {showAddStudent ? 'Cancelar' : '+ Agregar'}
+              </button>
+            )}
+          </div>
+        </div>
 
         {showAddStudent && (
           <div className="p-4 border-b border-gray-100 bg-gray-50">
@@ -834,12 +925,14 @@ export default function FamilyDetail() {
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Nivel</label>
-                <select value={newStudentLevel} onChange={(e) => setNewStudentLevel(e.target.value)}
+                <select value={newStudentLevel} onChange={(e) => {
+                  setNewStudentLevel(e.target.value);
+                  setNewStudentGrade('');
+                }}
                   className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
                   <option value="jardin">Jardín</option>
                   <option value="primaria">Primaria</option>
                   <option value="secundaria">Secundaria</option>
-                  <option value="12vo">12vo</option>
                 </select>
               </div>
               <div>
@@ -850,7 +943,7 @@ export default function FamilyDetail() {
                   className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                 >
                   <option value="">Seleccionar</option>
-                  {GRADE_OPTIONS.map((g) => (
+                  {(GRADE_OPTIONS_BY_LEVEL[newStudentLevel] ?? []).map((g) => (
                     <option key={g.value} value={g.value}>{g.label}</option>
                   ))}
                 </select>
@@ -868,6 +961,7 @@ export default function FamilyDetail() {
             <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
               <th className="px-4 py-3 font-medium">Estudiante</th>
               <th className="px-4 py-3 font-medium text-right">Cuota pura</th>
+              <th className="px-4 py-3 font-medium text-right">% desc.</th>
               <th className="px-4 py-3 font-medium text-right">Descuento</th>
               <th className="px-4 py-3 font-medium">Nivel</th>
               <th className="px-4 py-3 font-medium">Grado</th>
@@ -893,16 +987,19 @@ export default function FamilyDetail() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500 text-right">—</td>
                       <td className="px-4 py-3 text-sm text-gray-500 text-right">—</td>
+                      <td className="px-4 py-3 text-sm text-gray-500 text-right">—</td>
                       <td className="px-4 py-3">
                         <select
                           value={editStudentLevel}
-                          onChange={(e) => setEditStudentLevel(e.target.value)}
+                          onChange={(e) => {
+                            setEditStudentLevel(e.target.value);
+                            setEditStudentGrade('');
+                          }}
                           className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                         >
                           <option value="jardin">Jardín</option>
                           <option value="primaria">Primaria</option>
                           <option value="secundaria">Secundaria</option>
-                          <option value="12vo">12vo</option>
                         </select>
                       </td>
                       <td className="px-4 py-3">
@@ -912,7 +1009,7 @@ export default function FamilyDetail() {
                           className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                         >
                           <option value="">Seleccionar</option>
-                          {GRADE_OPTIONS.map((g) => (
+                          {(GRADE_OPTIONS_BY_LEVEL[editStudentLevel] ?? []).map((g) => (
                             <option key={g.value} value={g.value}>{g.label}</option>
                           ))}
                         </select>
@@ -950,10 +1047,15 @@ export default function FamilyDetail() {
                       <td className="px-4 py-3 text-sm text-gray-600 text-right">
                         {agreementStudent ? formatMoney(agreementStudent.base_tuition) : '—'}
                       </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 text-right">
+                        {agreementStudent ? `${Number(agreementStudent.discount_percentage).toFixed(2)}%` : '—'}
+                      </td>
                       <td className="px-4 py-3 text-sm text-red-600 text-right">
                         {agreementStudent ? `-${formatMoney(agreementStudent.discount_amount)}` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{LEVEL_LABELS[s.level] ?? s.level}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {LEVEL_LABELS[normalizedStudentLevel(s.level)] ?? normalizedStudentLevel(s.level)}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{s.grade}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{s.file_number ?? '—'}</td>
                       {can('canManageFamilies') && (
@@ -981,27 +1083,6 @@ export default function FamilyDetail() {
             })}
           </tbody>
         </table>
-        {agreement && !editing && (agreement.observations || agreement.granted_at || agreement.impact_starts_at || agreement.expires_at) && (
-          <div className="px-4 py-3 border-t border-gray-100 space-y-2">
-            <div className="flex gap-6 text-xs text-gray-400">
-              {agreement.granted_at && (
-                <span>Otorgado el {new Date(agreement.granted_at).toLocaleDateString('es-AR')}</span>
-              )}
-              {agreement.impact_starts_at && (
-                <span>Impacta desde {formatMonthYear(agreement.impact_starts_at)}</span>
-              )}
-              {agreement.expires_at && (
-                <span>Hasta {formatMonthYear(agreement.expires_at)}</span>
-              )}
-            </div>
-            {agreement.observations && (
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Observaciones</p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{agreement.observations}</p>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Ahorro mensual */}
@@ -1009,9 +1090,26 @@ export default function FamilyDetail() {
         <div className="bg-white rounded-xl border border-gray-200">
           <button
             onClick={() => showMonthlySavings ? setShowMonthlySavings(false) : loadMonthlySavings()}
-            className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors rounded-xl"
+            className="w-full p-4 flex items-center justify-between gap-4 hover:bg-gray-50 transition-colors rounded-xl"
           >
-            <h2 className="text-sm font-medium text-gray-900">Ahorro mensual</h2>
+            <div className="text-left">
+              <h2 className="text-sm font-medium text-gray-900">Ahorro del acuerdo</h2>
+              <p className="text-xs text-gray-400 mt-1">
+                {agreement.impact_starts_at && agreement.expires_at
+                  ? `${formatMonthYear(agreement.impact_starts_at)} a ${formatMonthYear(agreement.expires_at)}`
+                  : 'Según el período configurado'}
+              </p>
+            </div>
+            <div className="flex items-center gap-6 ml-auto">
+              <div className="text-right">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400">Hasta hoy</p>
+                <p className="text-sm font-semibold text-green-700">{formatMoney(savingsUntilToday)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400">Total acuerdo</p>
+                <p className="text-sm font-semibold text-gray-900">{formatMoney(totalAgreementSavings)}</p>
+              </div>
+            </div>
             <span className="text-xs text-gray-400">
               {loadingSavings ? 'Cargando...' : showMonthlySavings ? 'Ocultar' : 'Ver detalle'}
             </span>
@@ -1024,6 +1122,7 @@ export default function FamilyDetail() {
                   <tr className="text-left text-xs text-gray-500 border-t border-b border-gray-100">
                     <th className="px-4 py-3 font-medium">Mes</th>
                     <th className="px-4 py-3 font-medium">Tarifario</th>
+                    <th className="px-4 py-3 font-medium text-right">% aplicado</th>
                     <th className="px-4 py-3 font-medium text-right">Ahorro</th>
                     <th className="px-4 py-3 font-medium text-right">A pagar</th>
                   </tr>
@@ -1035,6 +1134,9 @@ export default function FamilyDetail() {
                         {MONTH_NAMES[entry.month.slice(5)] ?? entry.month} {entry.month.slice(0, 4)}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{entry.schedule_name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                        {entry.students[0]?.discount_percentage.toFixed(2)}%
+                      </td>
                       <td className="px-4 py-3 text-sm text-green-600 text-right font-medium">
                         {formatMoney(entry.total_savings)}
                       </td>
@@ -1046,7 +1148,7 @@ export default function FamilyDetail() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-gray-200 bg-gray-50">
-                    <td colSpan={2} className="px-4 py-3 text-sm font-medium text-gray-900">
+                    <td colSpan={3} className="px-4 py-3 text-sm font-medium text-gray-900">
                       Total período
                     </td>
                     <td className="px-4 py-3 text-sm text-green-700 text-right font-semibold">
@@ -1066,7 +1168,9 @@ export default function FamilyDetail() {
                   <div className="space-y-1">
                     {monthlySavings[monthlySavings.length - 1].students.map((s) => (
                       <div key={s.student_id} className="flex justify-between text-xs text-gray-600">
-                        <span>{s.student_name} ({LEVEL_LABELS[s.level] ?? s.level})</span>
+                        <span>
+                          {s.student_name} ({LEVEL_LABELS[normalizedStudentLevel(s.level)] ?? normalizedStudentLevel(s.level)})
+                        </span>
                         <span>
                           Cuota {formatMoney(s.tuition_amount)}
                           {s.extras_amount > 0 ? ` + ${formatMoney(s.extras_amount)} extras` : ''}
@@ -1088,102 +1192,89 @@ export default function FamilyDetail() {
         </div>
       )}
 
-      {showFamilyNotes && (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-4 border-b border-gray-100">
-            <h2 className="text-sm font-medium text-gray-900">
-              Notas {familyComments.length > 0 && <span className="text-gray-400 font-normal">({familyComments.length})</span>}
-            </h2>
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-gray-900">
+                Observaciones generales para informe
+              </h2>
+              <p className="text-xs text-gray-400 mt-1">Nota editable que se incluye en el reporte exportado</p>
+            </div>
+            {can('canManageFamilies') && (
+              <button
+                onClick={saveFamilyNotes}
+                disabled={savingFamilyNotes || familyNotes === (family.notes ?? '')}
+                className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50"
+              >
+                {savingFamilyNotes ? 'Guardando...' : 'Guardar'}
+              </button>
+            )}
           </div>
 
-          {can('canComment') && (
-            <div className="p-4 border-b border-gray-100">
-              <div className="flex gap-3">
-                <textarea
-                  value={newFamilyComment}
-                  onChange={(e) => setNewFamilyComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddFamilyComment(); } }}
-                  placeholder="Agregar una nota sobre la familia..."
-                  rows={2}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
-                />
-                <button
-                  onClick={handleAddFamilyComment}
-                  disabled={!newFamilyComment.trim() || sendingComment}
-                  className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                >
-                  {sendingComment ? '...' : 'Enviar'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {familyComments.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin notas aún</p>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {familyComments.map((c) => (
-                <div key={c.id} className="px-4 py-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-gray-900">{c.user_name}</span>
-                    <span className="text-xs text-gray-400">{timeAgo(c.created_at)}</span>
-                  </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Comentarios del acuerdo */}
-      {agreement && (
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-4 border-b border-gray-100">
-            <h2 className="text-sm font-medium text-gray-900">
-              Comentarios del acuerdo {agreementComments.length > 0 && <span className="text-gray-400 font-normal">({agreementComments.length})</span>}
-            </h2>
+          <div className="p-4">
+            <textarea
+              value={familyNotes}
+              onChange={(e) => setFamilyNotes(e.target.value)}
+              readOnly={!can('canManageFamilies')}
+              placeholder="Agregar observaciones generales para el informe..."
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none read-only:bg-gray-50 read-only:text-gray-600"
+            />
+            {familyNotesError && (
+              <p className="mt-2 text-xs text-red-600">{familyNotesError}</p>
+            )}
           </div>
-
-          {can('canComment') && (
-            <div className="p-4 border-b border-gray-100">
-              <div className="flex gap-3">
-                <textarea
-                  value={newAgreementComment}
-                  onChange={(e) => setNewAgreementComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddAgreementComment(); } }}
-                  placeholder="Comentario sobre el acuerdo..."
-                  rows={2}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
-                />
-                <button
-                  onClick={handleAddAgreementComment}
-                  disabled={!newAgreementComment.trim() || sendingComment}
-                  className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                >
-                  {sendingComment ? '...' : 'Enviar'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {agreementComments.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin comentarios aún</p>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {agreementComments.map((c) => (
-                <div key={c.id} className="px-4 py-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-gray-900">{c.user_name}</span>
-                    <span className="text-xs text-gray-400">{timeAgo(c.created_at)}</span>
-                  </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-      )}
+
+        {agreement && (
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-sm font-medium text-gray-900">
+                Comentarios del acuerdo {agreementComments.length > 0 && <span className="text-gray-400 font-normal">({agreementComments.length})</span>}
+              </h2>
+            </div>
+
+            {can('canComment') && (
+              <div className="p-4 border-b border-gray-100">
+                <div className="flex gap-3">
+                  <textarea
+                    value={newAgreementComment}
+                    onChange={(e) => setNewAgreementComment(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddAgreementComment(); } }}
+                    placeholder="Comentario sobre el acuerdo..."
+                    rows={2}
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                  />
+                  <button
+                    onClick={handleAddAgreementComment}
+                    disabled={!newAgreementComment.trim() || sendingComment}
+                    className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                  >
+                    {sendingComment ? '...' : 'Enviar'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {agreementComments.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin comentarios aún</p>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {agreementComments.map((c) => (
+                  <div key={c.id} className="px-4 py-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-gray-900">{c.user_name}</span>
+                      <span className="text-xs text-gray-400">{timeAgo(c.created_at)}</span>
+                    </div>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

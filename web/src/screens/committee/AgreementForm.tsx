@@ -19,15 +19,20 @@ const LEVEL_LABELS: Record<string, string> = {
   '12vo': '12vo',
 };
 
-const AGREEMENT_MONTH_OPTIONS = [
-  { value: '2026-02', label: 'Febrero 2026' },
-  { value: '2026-03', label: 'Marzo 2026' },
-  { value: '2026-04', label: 'Abril 2026' },
-  { value: '2026-05', label: 'Mayo 2026' },
-  { value: '2026-06', label: 'Junio 2026' },
-  { value: '2026-07', label: 'Julio 2026' },
-  { value: '2026-08', label: 'Agosto 2026' },
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
+
+const AGREEMENT_MONTH_OPTIONS = Array.from({ length: 19 }, (_, i) => {
+  const date = new Date(2026, 1 + i, 1);
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  return {
+    value: `${year}-${String(month).padStart(2, '0')}`,
+    label: `${MONTH_NAMES[month - 1]} ${year}`,
+  };
+});
 
 function monthToStartDate(month: string): string {
   return `${month}-01`;

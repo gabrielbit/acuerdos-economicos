@@ -63,13 +63,18 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   suspendido: { label: 'Vencido', className: 'bg-gray-100 text-gray-500' },
 };
 
-const AGREEMENT_MONTH_OPTIONS = Array.from({ length: 19 }, (_, i) => {
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+const AGREEMENT_MONTH_OPTIONS = Array.from({ length: 24 }, (_, i) => {
   const date = new Date(2026, 1 + i, 1);
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
   return {
     value: `${year}-${String(month).padStart(2, '0')}`,
-    label: `${MONTH_NAMES[String(month).padStart(2, '0')]} ${year}`,
+    label: `${MONTH_NAMES[month - 1]} ${year}`,
   };
 });
 

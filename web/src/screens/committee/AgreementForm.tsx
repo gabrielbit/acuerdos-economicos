@@ -24,7 +24,7 @@ const MONTH_NAMES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
-const AGREEMENT_MONTH_OPTIONS = Array.from({ length: 19 }, (_, i) => {
+const AGREEMENT_MONTH_OPTIONS = Array.from({ length: 24 }, (_, i) => {
   const date = new Date(2026, 1 + i, 1);
   const year = date.getFullYear();
   const month = date.getMonth() + 1;

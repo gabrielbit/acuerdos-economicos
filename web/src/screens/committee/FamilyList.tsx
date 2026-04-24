@@ -128,8 +128,20 @@ export default function FamilyList() {
       );
 
       const studentCount = familyDetails.reduce((sum, family) => sum + family.students.length, 0);
-      const totalAid = filtered.reduce((sum, family) => sum + Number(family.total_discount ?? 0), 0);
-      const totalToPay = filtered.reduce((sum, family) => sum + Number(family.total_to_pay ?? 0), 0);
+      const totalAid = familyDetails.reduce((sum, family) => {
+        const agreement = agreementsByFamilyId.get(family.id);
+        return sum + (agreement?.students ?? []).reduce(
+          (familySum, student) => familySum + Number(student.discount_amount ?? 0),
+          0
+        );
+      }, 0);
+      const totalToPay = familyDetails.reduce((sum, family) => {
+        const agreement = agreementsByFamilyId.get(family.id);
+        return sum + (agreement?.students ?? []).reduce(
+          (familySum, student) => familySum + Number(student.amount_to_pay ?? 0),
+          0
+        );
+      }, 0);
       const generatedAt = new Date().toLocaleDateString('es-AR', {
         day: '2-digit',
         month: 'long',
@@ -139,6 +151,10 @@ export default function FamilyList() {
       const rowsHtml = familyDetails.map((family) => {
         const summary = filtered.find((f) => f.id === family.id) ?? family;
         const agreement = agreementsByFamilyId.get(family.id);
+        const familyAmountToPay = (agreement?.students ?? []).reduce(
+          (sum, student) => sum + Number(student.amount_to_pay ?? 0),
+          0
+        );
         const students = family.students.length > 0 ? family.students : [{
           id: 0,
           family_id: family.id,
@@ -178,7 +194,7 @@ export default function FamilyList() {
               <td class="percent">${discountPercentage != null ? `${Number(discountPercentage).toFixed(0)}%` : '—'}</td>
               <td class="money aid">${agreementStudent ? formatMoney(agreementStudent.discount_amount) : '—'}</td>
               ${index === 0 ? `
-                <td class="money family-total" rowspan="${students.length}">${summary.total_to_pay != null ? formatMoney(summary.total_to_pay) : '—'}</td>
+                <td class="money family-total" rowspan="${students.length}">${agreement ? formatMoney(familyAmountToPay) : summary.total_to_pay != null ? formatMoney(summary.total_to_pay) : '—'}</td>
                 <td class="notes-cell" rowspan="${students.length}">${observations ? escapeHtml(observations) : '—'}</td>
               ` : ''}
             </tr>

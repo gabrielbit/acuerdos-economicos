@@ -36,7 +36,7 @@ export default function AgreementForm() {
   const [rates, setRates] = useState<TuitionRate[]>([]);
   const [activePeriod, setActivePeriod] = useState<AidPeriod | null>(null);
 
-  const [discountInput, setDiscountInput] = useState('0');
+  const [discountInput, setDiscountInput] = useState('');
   const [observations, setObservations] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -129,9 +129,7 @@ export default function AgreementForm() {
               const clamped = Math.min(100, Number(withoutLeadingZeros));
               setDiscountInput(String(clamped));
             }}
-            onBlur={() => {
-              if (discountInput === '') setDiscountInput('0');
-            }}
+            placeholder="Ej: 45"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
           />
         </div>

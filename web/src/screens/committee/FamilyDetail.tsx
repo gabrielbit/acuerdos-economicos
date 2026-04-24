@@ -384,6 +384,7 @@ export default function FamilyDetail() {
   if (!family) return <p className="text-sm text-gray-500 py-8 text-center">Familia no encontrada.</p>;
 
   const status = STATUS_LABELS[family.status] ?? STATUS_LABELS.solicitud;
+  const showFamilyNotes = false;
   const agreementStudentsById = new Map(
     (agreement?.students ?? []).map((as) => [as.student_id, as])
   );
@@ -501,8 +502,9 @@ export default function FamilyDetail() {
         )}
       </div>
 
-      {/* Entrevista */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Entrevista */}
+        <div className={`bg-white rounded-xl border border-gray-200 ${!can('canManageFamilies') ? 'lg:col-span-2' : ''}`}>
           <div className="p-4 flex items-center gap-3">
             <span className="text-sm font-medium text-gray-900">Entrevista</span>
             {!editingInterview && family.interview_date ? (
@@ -622,32 +624,33 @@ export default function FamilyDetail() {
           })()}
         </div>
 
-      {/* Invitación */}
-      {can('canManageFamilies') && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-900">Link de invitación</span>
-            {invitationLink ? (
-              <>
-                <input readOnly value={invitationLink}
-                  className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600" />
-                <button onClick={copyInvitationLink}
-                  className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 transition-colors">
-                  Copiar
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="flex-1 text-sm text-gray-400">Generá un link para que la familia se registre</span>
-                <button onClick={generateInvitation} disabled={generatingInvite}
-                  className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                  {generatingInvite ? 'Generando...' : 'Generar link'}
-                </button>
-              </>
-            )}
+        {/* Invitación */}
+        {can('canManageFamilies') && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-900">Link de invitación</span>
+              {invitationLink ? (
+                <>
+                  <input readOnly value={invitationLink}
+                    className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600" />
+                  <button onClick={copyInvitationLink}
+                    className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 transition-colors">
+                    Copiar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm text-gray-400">Generá un link para que la familia se registre</span>
+                  <button onClick={generateInvitation} disabled={generatingInvite}
+                    className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                    {generatingInvite ? 'Generando...' : 'Generar link'}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Estudiantes + acuerdo */}
       <div className="bg-white rounded-xl border border-gray-200">
@@ -977,52 +980,53 @@ export default function FamilyDetail() {
         </div>
       )}
 
-      {/* Notas de la familia */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-4 border-b border-gray-100">
-          <h2 className="text-sm font-medium text-gray-900">
-            Notas {familyComments.length > 0 && <span className="text-gray-400 font-normal">({familyComments.length})</span>}
-          </h2>
-        </div>
-
-        {can('canComment') && (
+      {showFamilyNotes && (
+        <div className="bg-white rounded-xl border border-gray-200">
           <div className="p-4 border-b border-gray-100">
-            <div className="flex gap-3">
-              <textarea
-                value={newFamilyComment}
-                onChange={(e) => setNewFamilyComment(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddFamilyComment(); } }}
-                placeholder="Agregar una nota sobre la familia..."
-                rows={2}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
-              />
-              <button
-                onClick={handleAddFamilyComment}
-                disabled={!newFamilyComment.trim() || sendingComment}
-                className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-              >
-                {sendingComment ? '...' : 'Enviar'}
-              </button>
-            </div>
+            <h2 className="text-sm font-medium text-gray-900">
+              Notas {familyComments.length > 0 && <span className="text-gray-400 font-normal">({familyComments.length})</span>}
+            </h2>
           </div>
-        )}
 
-        {familyComments.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin notas aún</p>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {familyComments.map((c) => (
-              <div key={c.id} className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-gray-900">{c.user_name}</span>
-                  <span className="text-xs text-gray-400">{timeAgo(c.created_at)}</span>
-                </div>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.content}</p>
+          {can('canComment') && (
+            <div className="p-4 border-b border-gray-100">
+              <div className="flex gap-3">
+                <textarea
+                  value={newFamilyComment}
+                  onChange={(e) => setNewFamilyComment(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddFamilyComment(); } }}
+                  placeholder="Agregar una nota sobre la familia..."
+                  rows={2}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                />
+                <button
+                  onClick={handleAddFamilyComment}
+                  disabled={!newFamilyComment.trim() || sendingComment}
+                  className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                >
+                  {sendingComment ? '...' : 'Enviar'}
+                </button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+
+          {familyComments.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin notas aún</p>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {familyComments.map((c) => (
+                <div key={c.id} className="px-4 py-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-900">{c.user_name}</span>
+                    <span className="text-xs text-gray-400">{timeAgo(c.created_at)}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Comentarios del acuerdo */}
       {agreement && (

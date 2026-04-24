@@ -36,11 +36,12 @@ export default function AgreementForm() {
   const [rates, setRates] = useState<TuitionRate[]>([]);
   const [activePeriod, setActivePeriod] = useState<AidPeriod | null>(null);
 
-  const [discount, setDiscount] = useState(0);
+  const [discountInput, setDiscountInput] = useState('0');
   const [observations, setObservations] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const discount = Number(discountInput || '0');
 
   useEffect(() => {
     if (!familyId) return;
@@ -115,12 +116,22 @@ export default function AgreementForm() {
         <div className="max-w-xs">
           <label className="block text-sm font-medium text-gray-700 mb-1">% Descuento</label>
           <input
-            type="number"
-            min={0}
-            max={100}
-            step={1}
-            value={discount}
-            onChange={(e) => setDiscount(Number(e.target.value))}
+            type="text"
+            inputMode="numeric"
+            value={discountInput}
+            onChange={(e) => {
+              const digitsOnly = e.target.value.replace(/\D/g, '');
+              if (digitsOnly === '') {
+                setDiscountInput('');
+                return;
+              }
+              const withoutLeadingZeros = digitsOnly.replace(/^0+(?=\d)/, '');
+              const clamped = Math.min(100, Number(withoutLeadingZeros));
+              setDiscountInput(String(clamped));
+            }}
+            onBlur={() => {
+              if (discountInput === '') setDiscountInput('0');
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
           />
         </div>

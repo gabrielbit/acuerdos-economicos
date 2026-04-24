@@ -241,14 +241,14 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
       ),
       grants AS (
         SELECT
-          date_trunc('month', a.granted_at) AS month_start,
+          date_trunc('month', COALESCE(a.impact_starts_at, a.granted_at)) AS month_start,
           COUNT(DISTINCT a.family_id)::int AS families_joined,
           COALESCE(SUM(ast.discount_amount), 0)::numeric AS amount_joined
         FROM agreements a
         JOIN active_period ap ON ap.id = a.period_id
         LEFT JOIN agreement_students ast ON ast.agreement_id = a.id
-        WHERE a.granted_at IS NOT NULL
-          AND a.granted_at >= (SELECT MIN(month_start) FROM month_series)
+        WHERE COALESCE(a.impact_starts_at, a.granted_at) IS NOT NULL
+          AND COALESCE(a.impact_starts_at, a.granted_at) >= (SELECT MIN(month_start) FROM month_series)
         GROUP BY 1
       ),
       ${dropsCte}

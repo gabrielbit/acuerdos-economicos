@@ -14,7 +14,13 @@ import type { BudgetHistoryEntry, BudgetSummary } from '../../types';
 import { formatMoney } from '../../utils/format';
 
 function monthShortLabel(ym: string): string {
-  return new Date(`${ym}-01`).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
+  const [year, month] = ym.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
+}
+
+function monthLongLabel(ym: string): string {
+  const [year, month] = ym.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' });
 }
 
 export default function Metricas() {
@@ -49,14 +55,16 @@ export default function Metricas() {
   };
 
   const chartData = useMemo(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
     return [...history]
       .sort((a, b) => a.month.localeCompare(b.month))
       .map((row) => ({
         mes: monthShortLabel(row.month),
         Altas: row.amount_joined,
+        'En proceso': row.month === currentMonth ? budget?.granted_in_definition ?? 0 : 0,
         Bajas: row.amount_dropped,
       }));
-  }, [history]);
+  }, [budget?.granted_in_definition, history]);
 
   if (loading) {
     return <p className="text-sm text-gray-500 py-8 text-center">Cargando...</p>;
@@ -153,7 +161,9 @@ export default function Metricas() {
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="p-2 pb-4 border-b border-gray-100 mb-4">
           <h2 className="text-sm font-medium text-gray-900">Ingresos y egresos de acuerdos (montos mensuales)</h2>
-          <p className="text-xs text-gray-400 mt-1">Altas = becas al otorgar; bajas = becas al dar de baja el acuerdo.</p>
+          <p className="text-xs text-gray-400 mt-1">
+            Altas = becas al otorgar; En proceso = familias en proceso del mes actual; bajas = becas al dar de baja el acuerdo.
+          </p>
         </div>
         {chartData.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">Sin datos para el gráfico.</p>
@@ -175,6 +185,7 @@ export default function Metricas() {
                 />
                 <Legend />
                 <Bar dataKey="Altas" fill="#16a34a" name="Altas (ingreso compromiso)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="En proceso" fill="#f59e0b" name="En proceso (mes actual)" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Bajas" fill="#dc2626" name="Bajas (egreso compromiso)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -221,7 +232,7 @@ export default function Metricas() {
               {history.map((row) => (
                 <tr key={row.month} className="border-b border-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-700">
-                    {new Date(`${row.month}-01`).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })}
+                    {monthLongLabel(row.month)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-green-700">
                     {row.families_joined} fam. - {formatMoney(row.amount_joined)}

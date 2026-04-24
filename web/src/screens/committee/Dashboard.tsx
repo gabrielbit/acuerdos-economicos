@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
-import type { BudgetHistoryEntry, BudgetSummary, Family } from '../../types';
+import type { BudgetSummary, Family } from '../../types';
+import { formatMoney } from '../../utils/format';
 
 function formatInterviewShort(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -15,15 +16,6 @@ function formatInterviewShort(dateStr: string | null): string {
   if (isToday) return `Hoy ${time}`;
   if (isTomorrow) return `Mañana ${time}`;
   return `${d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' })} ${time}`;
-}
-
-function formatMoney(amount: number): string {
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 function timeAgo(dateStr: string): string {
@@ -68,10 +60,7 @@ export default function Dashboard() {
     entity_type: string; family_name: string | null; family_id: number | null;
   }>>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingHistory, setLoadingHistory] = useState(false);
   const [filter, setFilter] = useState('');
-  const [historyMonths, setHistoryMonths] = useState(12);
-  const [history, setHistory] = useState<BudgetHistoryEntry[]>([]);
   const [statusFilter, setStatusFilter] = useState<Set<string>>(
     new Set(['solicitud', 'formulario_enviado', 'formulario_completado', 'agendado', 'en_definicion'])
   );
@@ -82,30 +71,14 @@ export default function Dashboard() {
       api.getFamilies().catch(() => []),
       api.getUpcomingInterviews().catch(() => []),
       api.getRecentComments().catch(() => []),
-      api.getBudgetHistory(12).catch(() => []),
-    ]).then(([b, f, i, notes, historyData]) => {
+    ]).then(([b, f, i, notes]) => {
       setBudget(b);
       setFamilies(f);
       setInterviews(i);
       setRecentNotes(notes);
-      setHistory(historyData);
     })
       .finally(() => setLoading(false));
   }, []);
-
-  const changeHistoryRange = async (months: number) => {
-    if (months === historyMonths) return;
-    setHistoryMonths(months);
-    setLoadingHistory(true);
-    try {
-      const rows = await api.getBudgetHistory(months);
-      setHistory(rows);
-    } catch {
-      setHistory([]);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
 
   if (loading) {
     return <p className="text-sm text-gray-500 py-8 text-center">Cargando...</p>;
@@ -144,102 +117,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Métricas de presupuesto */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-gray-500 mb-1">Presupuesto total</p>
-          <p className="text-2xl font-semibold text-gray-900 tabular-nums">{formatMoney(budget.total_budget)}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-green-600 mb-1">Otorgado</p>
-          <p className="text-2xl font-semibold text-green-700 tabular-nums">{formatMoney(budget.granted_assigned)}</p>
-          <p className="text-sm text-gray-500 mt-1 tabular-nums">{budget.assigned_percentage.toFixed(0)}%</p>
-          <p className="text-xs text-gray-400 mt-1 tabular-nums">{budget.families_assigned} familias</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-amber-600 mb-1">En definición</p>
-          <p className="text-2xl font-semibold text-amber-600 tabular-nums">{formatMoney(budget.granted_in_definition)}</p>
-          <p className="text-sm text-gray-500 mt-1 tabular-nums">{budget.in_definition_percentage.toFixed(0)}%</p>
-          <p className="text-xs text-gray-400 mt-1 tabular-nums">{budget.families_in_definition} familias</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-gray-500 mb-1">Disponible</p>
-          <p className="text-2xl font-semibold text-gray-900 tabular-nums">{formatMoney(budget.available)}</p>
-          <p className="text-sm text-gray-500 mt-1 tabular-nums">{budget.available_percentage.toFixed(0)}%</p>
-          <p className="text-xs text-gray-400 mt-1 tabular-nums">{budget.families_pending} familias</p>
-        </div>
-        <div className="bg-green-50 rounded-xl border border-green-100 p-5 space-y-4">
-          <div>
-            <p className="text-sm text-green-700">Familias con acuerdo otorgado</p>
-            <p className="text-2xl font-semibold text-green-800 tabular-nums">{budget.families_assigned}</p>
-          </div>
-          <div className="pt-3 border-t border-green-200">
-            <p className="text-sm text-green-700">Alumnos impactados</p>
-            <p className="text-2xl font-semibold text-green-800 tabular-nums">{budget.students_assigned}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-4 border-b border-gray-100 flex items-center gap-3">
-          <h2 className="text-sm font-medium text-gray-900">Evolución de altas y bajas</h2>
-          <div className="ml-auto flex gap-1.5">
-            {[12, 24, 36, 60].map((months) => (
-              <button
-                key={months}
-                onClick={() => { void changeHistoryRange(months); }}
-                className={`px-2.5 py-1 text-xs rounded-full border ${
-                  historyMonths === months
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                {months}m
-              </button>
-            ))}
-          </div>
-        </div>
-        {loadingHistory ? (
-          <p className="px-4 py-6 text-sm text-gray-400 text-center">Cargando evolución...</p>
-        ) : history.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin datos históricos.</p>
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-                <th className="px-4 py-3 font-medium">Mes</th>
-                <th className="px-4 py-3 font-medium text-right">Altas</th>
-                <th className="px-4 py-3 font-medium text-right">Bajas</th>
-                <th className="px-4 py-3 font-medium text-right">% presupuesto (altas)</th>
-                <th className="px-4 py-3 font-medium text-right">% presupuesto (bajas)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((row) => (
-                <tr key={row.month} className="border-b border-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    {new Date(`${row.month}-01`).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-green-700">
-                    {row.families_joined} fam. - {formatMoney(row.amount_joined)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-red-600">
-                    {row.families_dropped} fam. - {formatMoney(row.amount_dropped)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-600">
-                    {row.joined_percentage.toFixed(1)}%
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-600">
-                    {row.dropped_percentage.toFixed(1)}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Barra de progreso por estado */}
+      {/* Barra de presupuesto por estado */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex justify-between text-xs text-gray-500 mb-2">
           <span className="flex items-center gap-1.5">
@@ -369,6 +247,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
+              type="button"
               onClick={() => {
                 const allKeys = Object.keys(STATUS_LABELS);
                 setStatusFilter((prev) => prev.size === allKeys.length ? new Set() : new Set(allKeys));
@@ -385,6 +264,7 @@ export default function Dashboard() {
               const active = statusFilter.has(key);
               return (
                 <button
+                  type="button"
                   key={key}
                   onClick={() => {
                     setStatusFilter((prev) => {

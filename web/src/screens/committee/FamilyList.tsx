@@ -84,6 +84,7 @@ export default function FamilyList() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'todos' | 'familia' | 'docente'>('todos');
   const [statusFilter, setStatusFilter] = useState<Set<string>>(
     new Set(['solicitud', 'formulario_enviado', 'formulario_completado', 'agendado', 'en_definicion'])
   );
@@ -108,8 +109,9 @@ export default function FamilyList() {
   const filtered = families
     .filter((f) => {
       const matchesName = !filter || f.name.toLowerCase().includes(filter.toLowerCase());
+      const matchesType = typeFilter === 'todos' || (f.family_type ?? 'familia') === typeFilter;
       const matchesStatus = statusFilter.size === 0 || statusFilter.has(f.status);
-      return matchesName && matchesStatus;
+      return matchesName && matchesType && matchesStatus;
     })
     .sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1;
@@ -155,12 +157,27 @@ export default function FamilyList() {
           <div className="flex items-center gap-3">
             <input
               type="text"
-              placeholder="Buscar familia..."
+              placeholder="Buscar..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             />
-            <span className="ml-auto text-xs text-gray-400">{filtered.length} familias</span>
+            <div className="flex gap-1">
+              {(['todos', 'familia', 'docente'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTypeFilter(t)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                    typeFilter === t
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {t === 'todos' ? 'Todos' : t === 'familia' ? 'Familias' : 'Docentes'}
+                </button>
+              ))}
+            </div>
+            <span className="ml-auto text-xs text-gray-400">{filtered.length}</span>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
@@ -230,9 +247,16 @@ export default function FamilyList() {
                 return (
                   <tr key={family.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <Link to={`/familias/${family.id}`} className="text-sm font-medium text-gray-900 hover:underline">
-                        {family.name}
-                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        <Link to={`/familias/${family.id}`} className="text-sm font-medium text-gray-900 hover:underline">
+                          {family.name}
+                        </Link>
+                        {(family.family_type ?? 'familia') === 'docente' && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-sky-50 text-sky-600">
+                            Docente
+                          </span>
+                        )}
+                      </div>
                       {family.parent_names && (
                         <p className="text-xs text-gray-400">{family.parent_names}</p>
                       )}

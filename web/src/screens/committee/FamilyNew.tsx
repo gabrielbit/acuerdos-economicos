@@ -10,6 +10,7 @@ interface NewStudent {
 
 export default function FamilyNew() {
   const navigate = useNavigate();
+  const [familyType, setFamilyType] = useState<'familia' | 'docente'>('familia');
   const [name, setName] = useState('');
   const [parentNames, setParentNames] = useState('');
   const [email, setEmail] = useState('');
@@ -42,6 +43,7 @@ export default function FamilyNew() {
         parent_names: parentNames.trim() || undefined,
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
+        family_type: familyType,
       });
 
       for (const s of students) {
@@ -68,13 +70,35 @@ export default function FamilyNew() {
         <Link to="/familias" className="text-sm text-gray-500 hover:text-gray-700">← Familias</Link>
       </div>
 
-      <h1 className="text-xl font-semibold text-gray-900">Nueva familia</h1>
+      <h1 className="text-xl font-semibold text-gray-900">
+        {familyType === 'docente' ? 'Nuevo docente' : 'Nueva familia'}
+      </h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="flex gap-2 mb-2">
+            <button type="button" onClick={() => setFamilyType('familia')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                familyType === 'familia'
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+              }`}>
+              Familia
+            </button>
+            <button type="button" onClick={() => setFamilyType('docente')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                familyType === 'docente'
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+              }`}>
+              Docente
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre familia *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {familyType === 'docente' ? 'Nombre docente *' : 'Nombre familia *'}
+              </label>
               <input value={name} onChange={(e) => setName(e.target.value)} required
                 placeholder="Ej: Gonzalez - Tozzini"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
@@ -142,7 +166,7 @@ export default function FamilyNew() {
         <div className="flex gap-3">
           <button type="submit" disabled={saving || !name.trim()}
             className="px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
-            {saving ? 'Creando...' : 'Crear familia'}
+            {saving ? 'Creando...' : familyType === 'docente' ? 'Crear docente' : 'Crear familia'}
           </button>
           <Link to="/familias"
             className="px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">

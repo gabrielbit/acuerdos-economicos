@@ -39,7 +39,7 @@ export const api = {
   getFamily: (id: number) =>
     request<import('../types').Family & { students: import('../types').Student[] }>(`/families/${id}`),
 
-  createFamily: (data: { name: string; parent_names?: string; email?: string; phone?: string }) =>
+  createFamily: (data: { name: string; parent_names?: string; email?: string; phone?: string; family_type?: string }) =>
     request<import('../types').Family>('/families', { method: 'POST', body: JSON.stringify(data) }),
 
   updateFamily: (id: number, data: Partial<import('../types').Family>) =>

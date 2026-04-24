@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Login from './screens/Login';
 import Register from './screens/Register';
 import Dashboard from './screens/committee/Dashboard';
+import Metricas from './screens/committee/Metricas';
 import FamilyDetail from './screens/committee/FamilyDetail';
 import FamilyList from './screens/committee/FamilyList';
 import AgreementForm from './screens/committee/AgreementForm';
@@ -49,6 +50,7 @@ function AppRoutes() {
       {/* Comisión */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
+        <Route path="/metricas" element={<Metricas />} />
         <Route path="/familias" element={<FamilyList />} />
         <Route path="/familias/nueva" element={<FamilyNew />} />
         <Route path="/familias/:id" element={<FamilyDetail />} />

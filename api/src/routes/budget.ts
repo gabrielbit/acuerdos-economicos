@@ -49,6 +49,37 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
         JOIN families f ON f.id = a.family_id
         LEFT JOIN valid_assigned_families vf ON vf.family_id = f.id AND vf.agreement_id = a.id
         LEFT JOIN agreement_students ast ON ast.agreement_id = a.id
+      ),
+      per_family_discount AS (
+        SELECT
+          vf.family_id,
+          MAX(a.discount_percentage)::numeric AS discount_percentage,
+          SUM(ast.discount_amount)::numeric AS monthly_discount
+        FROM valid_assigned_families vf
+        JOIN agreements a ON a.id = vf.agreement_id
+        JOIN agreement_students ast ON ast.agreement_id = vf.agreement_id
+        GROUP BY vf.family_id
+      ),
+      family_averages AS (
+        SELECT
+          AVG(pfd.discount_percentage) AS avg_granted_discount_percentage,
+          AVG(pfd.monthly_discount) AS avg_granted_monthly_discount_per_family
+        FROM per_family_discount pfd
+      ),
+      grant_velocity AS (
+        SELECT
+          (COALESCE((
+            SELECT SUM(mo.month_families)::numeric
+            FROM (
+              SELECT COUNT(DISTINCT a.family_id)::int AS month_families
+              FROM agreements a
+              JOIN active_period ap ON a.period_id = ap.id
+              WHERE a.granted_at IS NOT NULL
+                AND a.granted_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '6 months'
+                AND a.granted_at < date_trunc('month', CURRENT_DATE)
+              GROUP BY date_trunc('month', a.granted_at)
+            ) mo
+          ), 0) / 6.0) AS grant_velocity_families_per_month
       )
       SELECT
         ab.total_budget,
@@ -72,9 +103,14 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
         at.families_assigned,
         at.families_in_definition,
         at.families_pending,
-        at.students_assigned
+        at.students_assigned,
+        fa.avg_granted_discount_percentage,
+        fa.avg_granted_monthly_discount_per_family,
+        gv.grant_velocity_families_per_month
       FROM active_budget ab
       CROSS JOIN agreement_totals at
+      CROSS JOIN family_averages fa
+      CROSS JOIN grant_velocity gv
     `, [period_id ?? null]);
 
     if (result.rows.length === 0) {
@@ -92,16 +128,35 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
         families_in_definition: 0,
         families_pending: 0,
         students_assigned: 0,
+        grant_velocity_families_per_month: 0,
+        avg_granted_discount_percentage: null,
+        avg_granted_monthly_discount_per_family: null,
+        estimated_additional_families: null,
+        estimated_months_runway: null,
       };
     }
 
     const row = result.rows[0];
+    const available = Number(row.available);
+    const velocity = Number(row.grant_velocity_families_per_month ?? 0);
+    const avgAmt = row.avg_granted_monthly_discount_per_family != null
+      ? Number(row.avg_granted_monthly_discount_per_family)
+      : null;
+    const avgPct = row.avg_granted_discount_percentage != null
+      ? Number(row.avg_granted_discount_percentage)
+      : null;
+
+    const estimatedAdditionalFamilies =
+      avgAmt != null && avgAmt > 0 ? Math.floor(available / avgAmt) : null;
+    const estimatedMonthsRunway =
+      velocity > 0 && avgAmt != null && avgAmt > 0 ? available / (velocity * avgAmt) : null;
+
     return {
       total_budget: Number(row.total_budget),
       total_granted: Number(row.total_granted),
       granted_assigned: Number(row.granted_assigned),
       granted_in_definition: Number(row.granted_in_definition),
-      available: Number(row.available),
+      available,
       assigned_percentage: Number(row.assigned_percentage),
       in_definition_percentage: Number(row.in_definition_percentage),
       available_percentage: Number(row.available_percentage),
@@ -110,6 +165,11 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
       families_in_definition: row.families_in_definition,
       families_pending: row.families_pending,
       students_assigned: Number(row.students_assigned ?? 0),
+      grant_velocity_families_per_month: velocity,
+      avg_granted_discount_percentage: avgPct,
+      avg_granted_monthly_discount_per_family: avgAmt,
+      estimated_additional_families: estimatedAdditionalFamilies,
+      estimated_months_runway: estimatedMonthsRunway,
     };
   });
 

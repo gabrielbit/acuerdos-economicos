@@ -25,6 +25,8 @@ export type FamilyStatus =
   | 'rechazado'
   | 'suspendido';
 
+export type FamilyType = 'familia' | 'docente';
+
 export interface Family {
   id: number;
   name: string;
@@ -36,6 +38,7 @@ export interface Family {
   postal_code: string | null;
   user_id: number | null;
   created_at: string;
+  family_type: FamilyType;
   status: FamilyStatus;
   interview_date: string | null;
   student_count?: number;
@@ -181,6 +184,16 @@ export interface BudgetSummary {
   families_in_definition: number;
   families_pending: number;
   students_assigned: number;
+  /** Promedio de familias otorgadas por mes (últimos 6 meses calendario completos, sin el mes en curso). */
+  grant_velocity_families_per_month: number;
+  /** Promedio de % de descuento entre familias otorgadas válidas; null si no hay datos. */
+  avg_granted_discount_percentage: number | null;
+  /** Promedio de beca mensual total por familia otorgada válida; null si no hay datos. */
+  avg_granted_monthly_discount_per_family: number | null;
+  /** Estimación de cupos adicionales según saldo disponible y beca promedio; null si no aplica. */
+  estimated_additional_families: number | null;
+  /** Meses de “runway” al ritmo de otorgamiento y beca promedio; null si no aplica. */
+  estimated_months_runway: number | null;
 }
 
 export interface BudgetHistoryEntry {

@@ -6,6 +6,7 @@ const createFamilySchema = z.object({
   parent_names: z.string().optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),
+  family_type: z.enum(['familia', 'docente']).optional(),
 });
 
 const createStudentSchema = z.object({
@@ -27,7 +28,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     const result = await fastify.db.query(`
       SELECT
         f.id, f.name, f.parent_names, f.email, f.phone, f.user_id, f.created_at,
-        f.status::text AS status, f.interview_date,
+        f.family_type::text AS family_type, f.status::text AS status, f.interview_date,
         COUNT(DISTINCT s.id)::int AS student_count,
         a.discount_percentage,
         COALESCE(SUM(ast.base_tuition + ast.extras), 0)::numeric AS total_tuition,
@@ -50,7 +51,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     preHandler: [fastify.requireCommittee],
   }, async () => {
     const result = await fastify.db.query(`
-      SELECT f.id, f.name, f.parent_names, f.interview_date, f.status::text AS status
+      SELECT f.id, f.name, f.parent_names, f.interview_date, f.family_type::text AS family_type, f.status::text AS status
       FROM families f
       WHERE f.interview_date IS NOT NULL
         AND f.interview_date >= NOW() - INTERVAL '1 day'
@@ -90,10 +91,10 @@ export default async function familyRoutes(fastify: FastifyInstance) {
   }, async (request) => {
     const data = createFamilySchema.parse(request.body);
     const result = await fastify.db.query(
-      `INSERT INTO families (name, parent_names, email, phone)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO families (name, parent_names, email, phone, family_type)
+       VALUES ($1, $2, $3, $4, $5::family_type)
        RETURNING *`,
-      [data.name, data.parent_names, data.email, data.phone]
+      [data.name, data.parent_names, data.email, data.phone, data.family_type ?? 'familia']
     );
     return result.rows[0];
   });

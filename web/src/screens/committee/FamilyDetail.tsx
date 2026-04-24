@@ -429,7 +429,16 @@ export default function FamilyDetail() {
           <>
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">{family.name}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-semibold text-gray-900">{family.name}</h1>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                    (family.family_type ?? 'familia') === 'docente'
+                      ? 'bg-sky-50 text-sky-600'
+                      : 'bg-emerald-50 text-emerald-600'
+                  }`}>
+                    {(family.family_type ?? 'familia') === 'docente' ? 'Docente' : 'Familia'}
+                  </span>
+                </div>
                 {family.parent_names && (
                   <p className="text-sm text-gray-500 mt-1">{family.parent_names}</p>
                 )}
@@ -790,7 +799,9 @@ export default function FamilyDetail() {
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-sm font-medium text-gray-900">Acuerdo actual</h2>
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">{agreement.discount_percentage}% de descuento</span>
+              <span className="px-3 py-1 text-sm font-semibold rounded-full bg-emerald-50 text-emerald-700">
+                {agreement.discount_percentage}% de descuento
+              </span>
               {!editing && can('canManageAgreements') && (
                 <>
                   <button onClick={startEditing}

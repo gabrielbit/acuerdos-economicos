@@ -66,7 +66,6 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       FROM families f
       WHERE f.interview_date IS NOT NULL
         AND f.interview_date >= NOW() - INTERVAL '1 day'
-        AND f.status::text IN ('agendado', 'formulario_completado')
       ORDER BY f.interview_date ASC
       LIMIT 20
     `);

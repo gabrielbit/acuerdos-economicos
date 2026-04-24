@@ -200,12 +200,20 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Próximas entrevistas */}
-      {interviews.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-4 border-b border-gray-100">
-            <h2 className="text-sm font-medium text-gray-900">Próximas entrevistas</h2>
+      {/* Agenda de entrevistas */}
+      <div className="bg-white rounded-xl border border-gray-200">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-medium text-gray-900">Agenda de entrevistas</h2>
+            <p className="text-xs text-gray-400 mt-1">Próximas entrevistas agendadas</p>
           </div>
+          <span className="text-xs text-gray-400">{interviews.length} próximas</span>
+        </div>
+        {interviews.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-gray-400 text-center">
+            No hay entrevistas próximas agendadas
+          </p>
+        ) : (
           <div className="divide-y divide-gray-50">
             {interviews.map((interview) => {
               const date = new Date(interview.interview_date);
@@ -229,13 +237,18 @@ export default function Dashboard() {
                   <span className={`text-sm font-medium min-w-[56px] ${isPast ? 'text-gray-400' : isToday ? 'text-blue-600' : 'text-gray-700'}`}>
                     {dateLabel} {time}
                   </span>
-                  <span className="text-sm text-gray-900">{interview.name}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-900 truncate">{interview.name}</p>
+                    {interview.parent_names && (
+                      <p className="text-xs text-gray-400 truncate">{interview.parent_names}</p>
+                    )}
+                  </div>
                 </Link>
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Últimas notas agrupadas por familia */}
       {recentNotes.length > 0 && (() => {

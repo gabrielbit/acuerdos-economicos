@@ -90,7 +90,7 @@ function SortHeader({ label, sortKey, current, direction, onSort, align }: {
 }
 
 export default function FamilyList() {
-  const { can } = useAuth();
+  const { user, can } = useAuth();
   const [families, setFamilies] = useState<Family[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -152,6 +152,10 @@ export default function FamilyList() {
         );
         const familyStatus = STATUS_LABELS[family.status]?.label ?? family.status;
         const familyType = (family.family_type ?? 'familia') === 'docente' ? 'Docente' : 'Familia';
+        const periodLabel = agreement?.expires_at
+          ? `Hasta ${new Date(agreement.expires_at).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })}`
+          : 'Actual';
+        const observations = agreement?.observations?.trim();
 
         const studentRows = students.map((student, index) => {
           const agreementStudent = agreementStudents.get(student.id);
@@ -169,11 +173,13 @@ export default function FamilyList() {
               <td>${escapeHtml(student.name)}</td>
               <td>${escapeHtml(student.grade || '—')}</td>
               <td>${escapeHtml(familyStatus)}</td>
+              <td>${escapeHtml(periodLabel)}</td>
               <td class="money">${agreementStudent ? formatMoney(agreementStudent.base_tuition) : '—'}</td>
               <td class="percent">${discountPercentage != null ? `${Number(discountPercentage).toFixed(0)}%` : '—'}</td>
               <td class="money aid">${agreementStudent ? formatMoney(agreementStudent.discount_amount) : '—'}</td>
               ${index === 0 ? `
                 <td class="money family-total" rowspan="${students.length}">${summary.total_to_pay != null ? formatMoney(summary.total_to_pay) : '—'}</td>
+                <td class="notes-cell" rowspan="${students.length}">${observations ? escapeHtml(observations) : '—'}</td>
               ` : ''}
             </tr>
           `;
@@ -190,7 +196,7 @@ export default function FamilyList() {
             <meta charset="utf-8" />
             <title>Listado de familias</title>
             <style>
-              @page { size: A4 landscape; margin: 12mm; }
+              @page { size: A4 landscape; margin: 7mm; }
               * { box-sizing: border-box; }
               body {
                 margin: 0;
@@ -198,86 +204,93 @@ export default function FamilyList() {
                 background: #f8fafc;
                 font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
               }
-              .page { padding: 24px; }
+              .page { padding: 10px; }
               .hero {
                 display: flex;
                 justify-content: space-between;
                 align-items: flex-start;
-                gap: 24px;
-                padding: 22px 24px;
+                gap: 16px;
+                padding: 12px 14px;
                 border: 1px solid #e5e7eb;
-                border-radius: 18px;
+                border-radius: 14px;
                 background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 55%, #eff6ff 100%);
-                margin-bottom: 16px;
+                margin-bottom: 8px;
               }
-              h1 { margin: 0; font-size: 24px; letter-spacing: -0.03em; }
-              .subtitle { margin-top: 6px; color: #6b7280; font-size: 12px; }
+              h1 { margin: 0; font-size: 18px; letter-spacing: -0.03em; }
+              .subtitle { margin-top: 3px; color: #6b7280; font-size: 10px; }
               .stats {
                 display: grid;
                 grid-template-columns: repeat(4, minmax(110px, 1fr));
-                gap: 8px;
+                gap: 6px;
                 min-width: 520px;
               }
               .stat {
                 background: rgba(255,255,255,0.72);
                 border: 1px solid rgba(229,231,235,0.9);
-                border-radius: 14px;
-                padding: 10px 12px;
+                border-radius: 10px;
+                padding: 6px 8px;
               }
-              .stat span { display: block; color: #6b7280; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
-              .stat strong { display: block; margin-top: 3px; font-size: 17px; }
+              .stat span { display: block; color: #6b7280; font-size: 8px; text-transform: uppercase; letter-spacing: .06em; }
+              .stat strong { display: block; margin-top: 2px; font-size: 13px; }
               table {
                 width: 100%;
                 border-collapse: separate;
                 border-spacing: 0;
                 background: white;
                 border: 1px solid #e5e7eb;
-                border-radius: 16px;
+                border-radius: 12px;
                 overflow: hidden;
               }
               th {
                 background: #f9fafb;
                 color: #6b7280;
-                font-size: 10px;
+                font-size: 7px;
                 text-transform: uppercase;
                 letter-spacing: .06em;
-                padding: 10px 9px;
+                padding: 5px 4px;
                 text-align: left;
                 border-bottom: 1px solid #e5e7eb;
               }
               td {
-                font-size: 11px;
-                padding: 9px;
+                font-size: 8px;
+                padding: 4px;
                 border-bottom: 1px solid #f1f5f9;
                 vertical-align: top;
+                line-height: 1.22;
               }
               tr:last-child td { border-bottom: 0; }
               .family-cell {
-                width: 190px;
+                width: 130px;
                 background: #fcfcfd;
                 border-right: 1px solid #f1f5f9;
               }
-              .family-cell strong { display: block; font-size: 12px; }
+              .family-cell strong { display: block; font-size: 9px; }
               .family-cell span, .family-cell small {
                 display: block;
-                margin-top: 3px;
+                margin-top: 1px;
                 color: #6b7280;
                 line-height: 1.35;
               }
-              .type-cell { width: 70px; color: #0369a1; font-weight: 700; }
+              .type-cell { width: 52px; color: #0369a1; font-weight: 700; }
               .money, .percent { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
               .aid { color: #047857; font-weight: 700; }
               .family-total { background: #f0fdf4; color: #065f46; font-weight: 800; }
+              .notes-cell {
+                width: 165px;
+                color: #4b5563;
+                max-width: 165px;
+              }
               .footer {
-                margin-top: 10px;
+                margin-top: 6px;
                 color: #9ca3af;
-                font-size: 10px;
+                font-size: 8px;
                 text-align: right;
               }
               @media print {
                 body { background: white; }
                 .page { padding: 0; }
-                .hero, table { break-inside: avoid; }
+                .hero { break-inside: avoid; }
+                tr { break-inside: avoid; page-break-inside: avoid; }
               }
             </style>
           </head>
@@ -286,7 +299,7 @@ export default function FamilyList() {
               <section class="hero">
                 <div>
                   <h1>Listado actual de familias</h1>
-                  <p class="subtitle">Exportado según los filtros activos el ${generatedAt}</p>
+                  <p class="subtitle">Exportado el ${generatedAt} por ${escapeHtml(user?.name ?? user?.email ?? 'Usuario')}</p>
                 </div>
                 <div class="stats">
                   <div class="stat"><span>Familias</span><strong>${filtered.length}</strong></div>
@@ -303,10 +316,12 @@ export default function FamilyList() {
                     <th>Estudiante</th>
                     <th>Curso</th>
                     <th>Estado</th>
+                    <th>Período</th>
                     <th class="money">Cuota pura</th>
                     <th class="money">%</th>
                     <th class="money">Ayuda económica</th>
-                    <th class="money">Total paga familia</th>
+                    <th class="money">Total Familia</th>
+                    <th>Observaciones</th>
                   </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>

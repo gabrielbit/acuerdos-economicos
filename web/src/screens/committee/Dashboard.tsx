@@ -52,6 +52,36 @@ interface Interview {
   status: string;
 }
 
+type SortKey = 'name' | 'status' | 'discount';
+type SortDir = 'asc' | 'desc';
+
+function SortHeader({ label, sortKey, current, direction, onSort, align }: {
+  label: string;
+  sortKey: SortKey;
+  current: SortKey;
+  direction: SortDir;
+  onSort: (key: SortKey) => void;
+  align?: 'right';
+}) {
+  const active = current === sortKey;
+  return (
+    <th
+      className={`px-4 py-3 font-medium cursor-pointer select-none hover:text-gray-900 transition-colors ${align === 'right' ? 'text-right' : ''}`}
+      onClick={() => onSort(sortKey)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {align === 'right' && active && (
+          <span className="text-gray-400">{direction === 'asc' ? '↑' : '↓'}</span>
+        )}
+        {label}
+        {align !== 'right' && active && (
+          <span className="text-gray-400">{direction === 'asc' ? '↑' : '↓'}</span>
+        )}
+      </span>
+    </th>
+  );
+}
+
 export default function Dashboard() {
   const [budget, setBudget] = useState<BudgetSummary | null>(null);
   const [families, setFamilies] = useState<Family[]>([]);
@@ -66,6 +96,8 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<Set<string>>(
     new Set(['solicitud', 'formulario_enviado', 'formulario_completado', 'agendado', 'en_definicion'])
   );
+  const [sortKey, setSortKey] = useState<SortKey>('status');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
 
   useEffect(() => {
     Promise.all([
@@ -101,6 +133,15 @@ export default function Dashboard() {
     suspendido: 7,
   };
 
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === 'discount' ? 'desc' : 'asc');
+  };
+
   const filteredFamilies = families
     .filter((f) => {
       const matchesName = !filter || f.name.toLowerCase().includes(filter.toLowerCase());
@@ -109,13 +150,21 @@ export default function Dashboard() {
       return matchesName && matchesType && matchesStatus;
     })
     .sort((a, b) => {
-      const statusA = STATUS_ORDER[a.status] ?? 9;
-      const statusB = STATUS_ORDER[b.status] ?? 9;
-      if (statusA !== statusB) return statusA - statusB;
-      const discA = Number(a.discount_percentage ?? 0);
-      const discB = Number(b.discount_percentage ?? 0);
-      if (discA !== discB) return discB - discA;
-      return a.name.localeCompare(b.name);
+      const dir = sortDir === 'asc' ? 1 : -1;
+      switch (sortKey) {
+        case 'name':
+          return a.name.localeCompare(b.name) * dir;
+        case 'status': {
+          const statusA = STATUS_ORDER[a.status] ?? 9;
+          const statusB = STATUS_ORDER[b.status] ?? 9;
+          if (statusA !== statusB) return (statusA - statusB) * dir;
+          return a.name.localeCompare(b.name);
+        }
+        case 'discount':
+          return (Number(a.discount_percentage ?? 0) - Number(b.discount_percentage ?? 0)) * dir;
+        default:
+          return 0;
+      }
     });
 
   return (
@@ -253,11 +302,11 @@ export default function Dashboard() {
         <table className="w-full">
           <thead>
             <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-              <th className="px-4 py-3 font-medium">Familia</th>
+              <SortHeader label="Familia" sortKey="name" current={sortKey} direction={sortDir} onSort={handleSort} />
               <th className="px-4 py-3 font-medium">Hijos</th>
-              <th className="px-4 py-3 font-medium">Estado</th>
+              <SortHeader label="Estado" sortKey="status" current={sortKey} direction={sortDir} onSort={handleSort} />
               <th className="px-4 py-3 font-medium">Entrevista</th>
-              <th className="px-4 py-3 font-medium text-right">% Descuento</th>
+              <SortHeader label="% Descuento" sortKey="discount" current={sortKey} direction={sortDir} onSort={handleSort} align="right" />
               <th className="px-4 py-3 font-medium text-right">Cuota total</th>
               <th className="px-4 py-3 font-medium text-right">Descuento mensual</th>
             </tr>

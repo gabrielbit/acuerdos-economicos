@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
-import type { Family } from '../../types';
+import type { Agreement, Family, Student } from '../../types';
 import FamilyFilters from '../../components/FamilyFilters';
 
 function formatMoney(amount: number): string {
@@ -12,6 +12,15 @@ function formatMoney(amount: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 }
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
@@ -84,6 +93,7 @@ export default function FamilyList() {
   const { can } = useAuth();
   const [families, setFamilies] = useState<Family[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [filter, setFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState<'todos' | 'familia' | 'docente'>('todos');
   const [statusFilter, setStatusFilter] = useState<Set<string>>(
@@ -102,6 +112,217 @@ export default function FamilyList() {
     } else {
       setSortKey(key);
       setSortDir(key === 'discount' || key === 'total_discount' ? 'desc' : 'asc');
+    }
+  };
+
+  const exportFilteredFamilies = async () => {
+    if (filtered.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const [familyDetails, agreements] = await Promise.all([
+        Promise.all(filtered.map((family) => api.getFamily(family.id))),
+        api.getAgreements(),
+      ]);
+      const agreementsByFamilyId = new Map<number, Agreement>(
+        agreements.map((agreement) => [agreement.family_id, agreement])
+      );
+
+      const studentCount = familyDetails.reduce((sum, family) => sum + family.students.length, 0);
+      const totalAid = filtered.reduce((sum, family) => sum + Number(family.total_discount ?? 0), 0);
+      const totalToPay = filtered.reduce((sum, family) => sum + Number(family.total_to_pay ?? 0), 0);
+      const generatedAt = new Date().toLocaleDateString('es-AR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      });
+
+      const rowsHtml = familyDetails.map((family) => {
+        const summary = filtered.find((f) => f.id === family.id) ?? family;
+        const agreement = agreementsByFamilyId.get(family.id);
+        const students = family.students.length > 0 ? family.students : [{
+          id: 0,
+          family_id: family.id,
+          name: 'Sin estudiantes',
+          level: 'primaria',
+          grade: '—',
+          file_number: null,
+        } satisfies Student];
+        const agreementStudents = new Map(
+          (agreement?.students ?? []).map((student) => [student.student_id, student])
+        );
+        const familyStatus = STATUS_LABELS[family.status]?.label ?? family.status;
+        const familyType = (family.family_type ?? 'familia') === 'docente' ? 'Docente' : 'Familia';
+
+        const studentRows = students.map((student, index) => {
+          const agreementStudent = agreementStudents.get(student.id);
+          const discountPercentage = agreementStudent?.discount_percentage ?? agreement?.discount_percentage;
+          return `
+            <tr>
+              ${index === 0 ? `
+                <td class="family-cell" rowspan="${students.length}">
+                  <strong>${escapeHtml(family.name)}</strong>
+                  ${family.parent_names ? `<span>${escapeHtml(family.parent_names)}</span>` : ''}
+                  ${family.email ? `<small>${escapeHtml(family.email)}</small>` : ''}
+                </td>
+                <td class="type-cell" rowspan="${students.length}">${familyType}</td>
+              ` : ''}
+              <td>${escapeHtml(student.name)}</td>
+              <td>${escapeHtml(student.grade || '—')}</td>
+              <td>${escapeHtml(familyStatus)}</td>
+              <td class="money">${agreementStudent ? formatMoney(agreementStudent.base_tuition) : '—'}</td>
+              <td class="percent">${discountPercentage != null ? `${Number(discountPercentage).toFixed(0)}%` : '—'}</td>
+              <td class="money aid">${agreementStudent ? formatMoney(agreementStudent.discount_amount) : '—'}</td>
+              ${index === 0 ? `
+                <td class="money family-total" rowspan="${students.length}">${summary.total_to_pay != null ? formatMoney(summary.total_to_pay) : '—'}</td>
+              ` : ''}
+            </tr>
+          `;
+        }).join('');
+
+        return studentRows;
+      }).join('');
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return;
+      printWindow.document.write(`<!doctype html>
+        <html lang="es">
+          <head>
+            <meta charset="utf-8" />
+            <title>Listado de familias</title>
+            <style>
+              @page { size: A4 landscape; margin: 12mm; }
+              * { box-sizing: border-box; }
+              body {
+                margin: 0;
+                color: #111827;
+                background: #f8fafc;
+                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+              }
+              .page { padding: 24px; }
+              .hero {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 24px;
+                padding: 22px 24px;
+                border: 1px solid #e5e7eb;
+                border-radius: 18px;
+                background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 55%, #eff6ff 100%);
+                margin-bottom: 16px;
+              }
+              h1 { margin: 0; font-size: 24px; letter-spacing: -0.03em; }
+              .subtitle { margin-top: 6px; color: #6b7280; font-size: 12px; }
+              .stats {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(110px, 1fr));
+                gap: 8px;
+                min-width: 520px;
+              }
+              .stat {
+                background: rgba(255,255,255,0.72);
+                border: 1px solid rgba(229,231,235,0.9);
+                border-radius: 14px;
+                padding: 10px 12px;
+              }
+              .stat span { display: block; color: #6b7280; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+              .stat strong { display: block; margin-top: 3px; font-size: 17px; }
+              table {
+                width: 100%;
+                border-collapse: separate;
+                border-spacing: 0;
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 16px;
+                overflow: hidden;
+              }
+              th {
+                background: #f9fafb;
+                color: #6b7280;
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: .06em;
+                padding: 10px 9px;
+                text-align: left;
+                border-bottom: 1px solid #e5e7eb;
+              }
+              td {
+                font-size: 11px;
+                padding: 9px;
+                border-bottom: 1px solid #f1f5f9;
+                vertical-align: top;
+              }
+              tr:last-child td { border-bottom: 0; }
+              .family-cell {
+                width: 190px;
+                background: #fcfcfd;
+                border-right: 1px solid #f1f5f9;
+              }
+              .family-cell strong { display: block; font-size: 12px; }
+              .family-cell span, .family-cell small {
+                display: block;
+                margin-top: 3px;
+                color: #6b7280;
+                line-height: 1.35;
+              }
+              .type-cell { width: 70px; color: #0369a1; font-weight: 700; }
+              .money, .percent { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+              .aid { color: #047857; font-weight: 700; }
+              .family-total { background: #f0fdf4; color: #065f46; font-weight: 800; }
+              .footer {
+                margin-top: 10px;
+                color: #9ca3af;
+                font-size: 10px;
+                text-align: right;
+              }
+              @media print {
+                body { background: white; }
+                .page { padding: 0; }
+                .hero, table { break-inside: avoid; }
+              }
+            </style>
+          </head>
+          <body>
+            <main class="page">
+              <section class="hero">
+                <div>
+                  <h1>Listado actual de familias</h1>
+                  <p class="subtitle">Exportado según los filtros activos el ${generatedAt}</p>
+                </div>
+                <div class="stats">
+                  <div class="stat"><span>Familias</span><strong>${filtered.length}</strong></div>
+                  <div class="stat"><span>Estudiantes</span><strong>${studentCount}</strong></div>
+                  <div class="stat"><span>Ayuda mensual</span><strong>${formatMoney(totalAid)}</strong></div>
+                  <div class="stat"><span>Total a pagar</span><strong>${formatMoney(totalToPay)}</strong></div>
+                </div>
+              </section>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Familia</th>
+                    <th>Tipo</th>
+                    <th>Estudiante</th>
+                    <th>Curso</th>
+                    <th>Estado</th>
+                    <th class="money">Cuota pura</th>
+                    <th class="money">%</th>
+                    <th class="money">Ayuda económica</th>
+                    <th class="money">Total paga familia</th>
+                  </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
+              <p class="footer">Acuerdos Económicos · reporte generado desde la sección Familias</p>
+            </main>
+            <script>
+              window.addEventListener('load', () => {
+                window.print();
+              });
+            </script>
+          </body>
+        </html>`);
+      printWindow.document.close();
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -145,12 +366,22 @@ export default function FamilyList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Familias</h1>
-        {can('canManageFamilies') && (
-          <Link to="/familias/nueva"
-            className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
-            + Nueva familia
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportFilteredFamilies}
+            disabled={exporting || filtered.length === 0}
+            className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            {exporting ? 'Exportando...' : 'Exportar PDF'}
+          </button>
+          {can('canManageFamilies') && (
+            <Link to="/familias/nueva"
+              className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
+              + Nueva familia
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200">

@@ -147,6 +147,8 @@ export default function FamilyList() {
         month: 'long',
         year: 'numeric',
       });
+      const fileDate = new Date().toISOString().slice(0, 10);
+      const reportTitle = `Reporte de Acuerdos Economicos - ${fileDate}`;
 
       const rowsHtml = familyDetails.map((family) => {
         const summary = filtered.find((f) => f.id === family.id) ?? family;
@@ -210,7 +212,7 @@ export default function FamilyList() {
         <html lang="es">
           <head>
             <meta charset="utf-8" />
-            <title>Listado de familias</title>
+            <title>${reportTitle}</title>
             <style>
               @page { size: A4 landscape; margin: 7mm; }
               * { box-sizing: border-box; }

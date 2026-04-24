@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import type { Family } from '../../types';
+import FamilyFilters from '../../components/FamilyFilters';
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('es-AR', {
@@ -154,74 +155,16 @@ export default function FamilyList() {
 
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-4 border-b border-gray-100 space-y-3">
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="Buscar..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-            />
-            <div className="flex gap-1">
-              {(['todos', 'familia', 'docente'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTypeFilter(t)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
-                    typeFilter === t
-                      ? 'bg-gray-900 text-white border-gray-900'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  {t === 'todos' ? 'Todos' : t === 'familia' ? 'Familias' : 'Docentes'}
-                </button>
-              ))}
-            </div>
-            <span className="ml-auto text-xs text-gray-400">{filtered.length}</span>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={() => {
-                const allKeys = Object.keys(STATUS_LABELS);
-                setStatusFilter((prev) => prev.size === allKeys.length ? new Set() : new Set(allKeys));
-              }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
-                statusFilter.size === Object.keys(STATUS_LABELS).length
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : statusFilter.size === 0
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              Todos
-            </button>
-            {Object.entries(STATUS_LABELS).map(([key, { label, className }]) => {
-              const active = statusFilter.has(key);
-              return (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setStatusFilter((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(key)) {
-                        next.delete(key);
-                      } else {
-                        next.add(key);
-                      }
-                      return next;
-                    });
-                  }}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
-                    active
-                      ? `${className} border-current`
-                      : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          <FamilyFilters
+            search={filter}
+            onSearchChange={setFilter}
+            resultCount={filtered.length}
+            statusLabels={STATUS_LABELS}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            typeFilter={typeFilter}
+            onTypeFilterChange={setTypeFilter}
+          />
         </div>
         <table className="w-full">
           <thead>

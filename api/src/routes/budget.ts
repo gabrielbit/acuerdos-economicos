@@ -39,11 +39,17 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
         SELECT
           COUNT(DISTINCT a.id)::int AS total_families,
           COUNT(DISTINCT vf.family_id)::int AS families_assigned,
-          COUNT(DISTINCT f.id) FILTER (WHERE f.status::text = 'en_definicion')::int AS families_in_definition,
-          COUNT(DISTINCT f.id) FILTER (WHERE f.status::text IN ('solicitud','formulario_enviado','formulario_completado','agendado'))::int AS families_pending,
+          COUNT(DISTINCT f.id) FILTER (
+            WHERE f.status::text IN ('solicitud','formulario_enviado','formulario_completado','agendado','en_definicion')
+          )::int AS families_in_definition,
+          COUNT(DISTINCT f.id) FILTER (
+            WHERE f.status::text IN ('rechazado','suspendido')
+          )::int AS families_pending,
           COUNT(DISTINCT ast.student_id) FILTER (WHERE vf.family_id IS NOT NULL)::int AS students_assigned,
           COALESCE(SUM(ast.discount_amount) FILTER (WHERE vf.family_id IS NOT NULL), 0) AS granted_assigned,
-          COALESCE(SUM(ast.discount_amount) FILTER (WHERE f.status::text = 'en_definicion'), 0) AS granted_in_definition
+          COALESCE(SUM(ast.discount_amount) FILTER (
+            WHERE f.status::text IN ('solicitud','formulario_enviado','formulario_completado','agendado','en_definicion')
+          ), 0) AS granted_in_definition
         FROM agreements a
         JOIN active_period ap ON a.period_id = ap.id
         JOIN families f ON f.id = a.family_id

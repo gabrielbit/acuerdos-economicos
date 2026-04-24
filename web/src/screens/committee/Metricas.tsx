@@ -91,7 +91,7 @@ export default function Metricas() {
           <p className="text-xs text-gray-400 mt-1 tabular-nums">{budget.families_assigned} familias</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-amber-600 mb-1">En definición</p>
+          <p className="text-sm text-amber-600 mb-1">En Proceso</p>
           <p className="text-2xl font-semibold text-amber-600 tabular-nums">{formatMoney(budget.granted_in_definition)}</p>
           <p className="text-sm text-gray-500 mt-1 tabular-nums">{budget.in_definition_percentage.toFixed(0)}%</p>
           <p className="text-xs text-gray-400 mt-1 tabular-nums">{budget.families_in_definition} familias</p>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { BudgetSummary, Family } from '../../types';
 import { formatMoney } from '../../utils/format';
+import FamilyFilters from '../../components/FamilyFilters';
 
 function formatInterviewShort(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -61,6 +62,7 @@ export default function Dashboard() {
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'todos' | 'familia' | 'docente'>('todos');
   const [statusFilter, setStatusFilter] = useState<Set<string>>(
     new Set(['solicitud', 'formulario_enviado', 'formulario_completado', 'agendado', 'en_definicion'])
   );
@@ -102,8 +104,9 @@ export default function Dashboard() {
   const filteredFamilies = families
     .filter((f) => {
       const matchesName = !filter || f.name.toLowerCase().includes(filter.toLowerCase());
+      const matchesType = typeFilter === 'todos' || (f.family_type ?? 'familia') === typeFilter;
       const matchesStatus = statusFilter.size === 0 || statusFilter.has(f.status);
-      return matchesName && matchesStatus;
+      return matchesName && matchesType && matchesStatus;
     })
     .sort((a, b) => {
       const statusA = STATUS_ORDER[a.status] ?? 9;
@@ -126,7 +129,7 @@ export default function Dashboard() {
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
-            {budget.families_in_definition} en definición ({budget.in_definition_percentage.toFixed(0)}%)
+            {budget.families_in_definition} en proceso ({budget.in_definition_percentage.toFixed(0)}%)
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-gray-300 inline-block" />
@@ -234,56 +237,18 @@ export default function Dashboard() {
       {/* Filtros y tabla de familias */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-4 border-b border-gray-100 space-y-3">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-medium text-gray-900">Familias</h2>
-            <input
-              type="text"
-              placeholder="Buscar familia..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-            />
-            <span className="ml-auto text-xs text-gray-400">{filteredFamilies.length} familias</span>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => {
-                const allKeys = Object.keys(STATUS_LABELS);
-                setStatusFilter((prev) => prev.size === allKeys.length ? new Set() : new Set(allKeys));
-              }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
-                statusFilter.size === Object.keys(STATUS_LABELS).length || statusFilter.size === 0
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              Todos
-            </button>
-            {Object.entries(STATUS_LABELS).map(([key, { label, className }]) => {
-              const active = statusFilter.has(key);
-              return (
-                <button
-                  type="button"
-                  key={key}
-                  onClick={() => {
-                    setStatusFilter((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(key)) next.delete(key); else next.add(key);
-                      return next;
-                    });
-                  }}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
-                    active
-                      ? `${className} border-current`
-                      : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          <h2 className="text-sm font-medium text-gray-900">Familias</h2>
+          <FamilyFilters
+            search={filter}
+            onSearchChange={setFilter}
+            resultCount={filteredFamilies.length}
+            statusLabels={STATUS_LABELS}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            typeFilter={typeFilter}
+            onTypeFilterChange={setTypeFilter}
+            searchPlaceholder="Buscar familia..."
+          />
         </div>
         <table className="w-full">
           <thead>
@@ -310,9 +275,16 @@ export default function Dashboard() {
                 return (
                   <tr key={family.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <Link to={`/familias/${family.id}`} className="text-sm font-medium text-gray-900 hover:underline">
-                        {family.name}
-                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        <Link to={`/familias/${family.id}`} className="text-sm font-medium text-gray-900 hover:underline">
+                          {family.name}
+                        </Link>
+                        {(family.family_type ?? 'familia') === 'docente' && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-sky-50 text-sky-600">
+                            Docente
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{family.student_count ?? 0}</td>
                     <td className="px-4 py-3">

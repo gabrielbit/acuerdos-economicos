@@ -434,6 +434,34 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       return reply.status(404).send({ error: 'Estudiante no encontrado' });
     }
 
+    // Si el estudiante participa en acuerdos, recalcular montos según su nivel actualizado.
+    // Usamos el tarifario vigente actual para mantener consistencia con la edición de acuerdos.
+    await fastify.db.query(`
+      WITH active_schedule AS (
+        SELECT fs.id
+        FROM fee_schedules fs
+        WHERE fs.effective_from <= CURRENT_DATE
+        ORDER BY fs.effective_from DESC
+        LIMIT 1
+      ),
+      active_rate AS (
+        SELECT fsr.level, fsr.tuition_amount, fsr.extras_amount
+        FROM fee_schedule_rates fsr
+        JOIN active_schedule acs ON acs.id = fsr.fee_schedule_id
+      )
+      UPDATE agreement_students ast
+      SET
+        level = s.level::education_level,
+        base_tuition = ar.tuition_amount,
+        extras = ar.extras_amount,
+        discount_amount = ROUND((ar.tuition_amount * ast.discount_percentage / 100.0)::numeric, 2),
+        amount_to_pay = ROUND((ar.tuition_amount - (ar.tuition_amount * ast.discount_percentage / 100.0) + ar.extras_amount)::numeric, 2)
+      FROM students s
+      JOIN active_rate ar ON ar.level = s.level
+      WHERE ast.student_id = s.id
+        AND s.id = $1::int
+    `, [studentId]);
+
     return result.rows[0];
   });
 

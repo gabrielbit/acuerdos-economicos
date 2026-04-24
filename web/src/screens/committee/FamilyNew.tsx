@@ -8,6 +8,14 @@ interface NewStudent {
   grade: string;
 }
 
+const GRADE_OPTIONS = [
+  { value: 'Jardin', label: 'Jardín' },
+  ...Array.from({ length: 12 }, (_, i) => {
+    const n = i + 1;
+    return { value: `EP ${n}`, label: `EP ${n}` };
+  }),
+];
+
 export default function FamilyNew() {
   const navigate = useNavigate();
   const [familyType, setFamilyType] = useState<'familia' | 'docente'>('familia');
@@ -148,9 +156,16 @@ export default function FamilyNew() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Grado</label>
-                  <input value={s.grade} onChange={(e) => updateStudent(i, 'grade', e.target.value)}
-                    placeholder="Ej: EP3"
-                    className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                  <select
+                    value={s.grade}
+                    onChange={(e) => updateStudent(i, 'grade', e.target.value)}
+                    className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  >
+                    <option value="">Seleccionar</option>
+                    {GRADE_OPTIONS.map((g) => (
+                      <option key={g.value} value={g.value}>{g.label}</option>
+                    ))}
+                  </select>
                 </div>
                 {students.length > 1 && (
                   <button type="button" onClick={() => removeStudentRow(i)}

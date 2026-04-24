@@ -45,6 +45,14 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   suspendido: { label: 'Vencido', className: 'bg-gray-100 text-gray-500' },
 };
 
+const GRADE_OPTIONS = [
+  { value: 'Jardin', label: 'Jardín' },
+  ...Array.from({ length: 12 }, (_, i) => {
+    const n = i + 1;
+    return { value: `EP ${n}`, label: `EP ${n}` };
+  }),
+];
+
 export default function FamilyDetail() {
   const { can } = useAuth();
   const { id } = useParams<{ id: string }>();
@@ -75,6 +83,7 @@ export default function FamilyDetail() {
 
   // Edición de familia
   const [editingFamily, setEditingFamily] = useState(false);
+  const [editFamilyType, setEditFamilyType] = useState<'familia' | 'docente'>('familia');
   const [editName, setEditName] = useState('');
   const [editParents, setEditParents] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -274,6 +283,7 @@ export default function FamilyDetail() {
 
   const startEditingFamily = () => {
     if (!family) return;
+    setEditFamilyType((family.family_type ?? 'familia') as 'familia' | 'docente');
     setEditName(family.name);
     setEditParents(family.parent_names ?? '');
     setEditEmail(family.email ?? '');
@@ -286,6 +296,7 @@ export default function FamilyDetail() {
     setSavingFamily(true);
     try {
       await api.updateFamily(family.id, {
+        family_type: editFamilyType,
         name: editName,
         parent_names: editParents || undefined,
         email: editEmail || undefined,
@@ -400,6 +411,33 @@ export default function FamilyDetail() {
         {editingFamily ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="block text-xs text-gray-500 mb-1">Tipo</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditFamilyType('familia')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                      editFamilyType === 'familia'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    Familia
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditFamilyType('docente')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                      editFamilyType === 'docente'
+                        ? 'bg-sky-50 text-sky-700 border-sky-200'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    Docente
+                  </button>
+                </div>
+              </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Nombre familia</label>
                 <input value={editName} onChange={(e) => setEditName(e.target.value)}
@@ -751,9 +789,16 @@ export default function FamilyDetail() {
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Grado</label>
-                <input value={newStudentGrade} onChange={(e) => setNewStudentGrade(e.target.value)}
-                  placeholder="Ej: EP3, 8vo"
-                  className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                <select
+                  value={newStudentGrade}
+                  onChange={(e) => setNewStudentGrade(e.target.value)}
+                  className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                >
+                  <option value="">Seleccionar</option>
+                  {GRADE_OPTIONS.map((g) => (
+                    <option key={g.value} value={g.value}>{g.label}</option>
+                  ))}
+                </select>
               </div>
               <button onClick={addStudent} disabled={savingStudent || !newStudentName.trim() || !newStudentGrade.trim()}
                 className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50">
@@ -806,11 +851,16 @@ export default function FamilyDetail() {
                         </select>
                       </td>
                       <td className="px-4 py-3">
-                        <input
+                        <select
                           value={editStudentGrade}
                           onChange={(e) => setEditStudentGrade(e.target.value)}
                           className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                        />
+                        >
+                          <option value="">Seleccionar</option>
+                          {GRADE_OPTIONS.map((g) => (
+                            <option key={g.value} value={g.value}>{g.label}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="px-4 py-3">
                         <input

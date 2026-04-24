@@ -10,10 +10,15 @@ interface NewStudent {
 
 const GRADE_OPTIONS = [
   { value: 'Jardin', label: 'Jardín' },
-  ...Array.from({ length: 12 }, (_, i) => {
+  ...Array.from({ length: 7 }, (_, i) => {
     const n = i + 1;
     return { value: `EP ${n}`, label: `EP ${n}` };
   }),
+  { value: '8vo', label: '8vo' },
+  { value: '9no', label: '9no' },
+  { value: '10mo', label: '10mo' },
+  { value: '11avo', label: '11avo' },
+  { value: '12 avo', label: '12 avo' },
 ];
 
 export default function FamilyNew() {

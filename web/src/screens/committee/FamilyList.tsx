@@ -34,6 +34,17 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   suspendido: { label: 'Vencido', className: 'bg-gray-100 text-gray-500' },
 };
 
+const PDF_STATUS_CLASSES: Record<string, string> = {
+  solicitud: 'status-solicitud',
+  formulario_enviado: 'status-formulario-enviado',
+  formulario_completado: 'status-formulario-completado',
+  agendado: 'status-agendado',
+  en_definicion: 'status-en-definicion',
+  otorgado: 'status-otorgado',
+  rechazado: 'status-rechazado',
+  suspendido: 'status-suspendido',
+};
+
 const STATUS_ORDER: Record<string, number> = {
   solicitud: 0,
   formulario_enviado: 1,
@@ -169,6 +180,7 @@ export default function FamilyList() {
           (agreement?.students ?? []).map((student) => [student.student_id, student])
         );
         const familyStatus = STATUS_LABELS[family.status]?.label ?? family.status;
+        const familyStatusClass = PDF_STATUS_CLASSES[family.status] ?? 'status-default';
         const familyType = (family.family_type ?? 'familia') === 'docente' ? 'Docente' : 'Familia';
         const periodLabel = agreement?.expires_at
           ? `Hasta ${new Date(agreement.expires_at).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })}`
@@ -190,7 +202,7 @@ export default function FamilyList() {
               ` : ''}
               <td>${escapeHtml(student.name)}</td>
               <td>${escapeHtml(student.grade || '—')}</td>
-              <td>${escapeHtml(familyStatus)}</td>
+              <td><span class="status-pill ${familyStatusClass}">${escapeHtml(familyStatus)}</span></td>
               <td>${escapeHtml(periodLabel)}</td>
               <td class="money">${agreementStudent ? formatMoney(agreementStudent.base_tuition) : '—'}</td>
               <td class="percent">${discountPercentage != null ? `${Number(discountPercentage).toFixed(0)}%` : '—'}</td>
@@ -290,6 +302,24 @@ export default function FamilyList() {
                 line-height: 1.35;
               }
               .type-cell { width: 52px; color: #0369a1; font-weight: 700; }
+              .status-pill {
+                display: inline-block;
+                padding: 2px 6px;
+                border-radius: 999px;
+                font-size: 7px;
+                line-height: 1.2;
+                font-weight: 700;
+                white-space: nowrap;
+              }
+              .status-solicitud { background: #faf5ff; color: #7e22ce; }
+              .status-formulario-enviado { background: #f5f3ff; color: #6d28d9; }
+              .status-formulario-completado { background: #eef2ff; color: #4338ca; }
+              .status-agendado { background: #eff6ff; color: #1d4ed8; }
+              .status-en-definicion { background: #fffbeb; color: #b45309; }
+              .status-otorgado { background: #f0fdf4; color: #15803d; }
+              .status-rechazado { background: #fef2f2; color: #b91c1c; }
+              .status-suspendido { background: #f3f4f6; color: #6b7280; }
+              .status-default { background: #f3f4f6; color: #374151; }
               .money, .percent { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
               .aid { color: #047857; font-weight: 700; }
               .family-total { background: #f0fdf4; color: #065f46; font-weight: 800; }

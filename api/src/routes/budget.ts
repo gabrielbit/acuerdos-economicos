@@ -254,6 +254,7 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
       ${dropsCte}
       SELECT
         ms.month_start::date AS month_start,
+        to_char(ms.month_start, 'YYYY-MM') AS month_key,
         mb.total_budget,
         COALESCE(g.families_joined, 0) AS families_joined,
         COALESCE(g.amount_joined, 0) AS amount_joined,
@@ -271,7 +272,7 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
       const joinedAmount = Number(row.amount_joined);
       const droppedAmount = Number(row.amount_dropped);
       return {
-        month: row.month_start.toISOString().slice(0, 7),
+        month: row.month_key,
         total_budget: budget,
         families_joined: row.families_joined,
         amount_joined: joinedAmount,

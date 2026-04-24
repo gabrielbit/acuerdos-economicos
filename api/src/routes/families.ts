@@ -364,8 +364,8 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     } else {
       const periodResult = await fastify.db.query(`
         SELECT
-          COALESCE(a.impact_starts_at, make_date(ap.year, ap.start_month, 1)) AS starts_at,
-          COALESCE(a.expires_at, make_date(ap.year, ap.end_month, 1)) AS ends_at
+          to_char(COALESCE(a.impact_starts_at, make_date(ap.year, ap.start_month, 1)), 'YYYY-MM-DD') AS starts_at,
+          to_char(COALESCE(a.expires_at, make_date(ap.year, ap.end_month, 1)), 'YYYY-MM') AS ends_month
         FROM agreements a
         JOIN aid_periods ap ON ap.id = a.period_id
         WHERE a.family_id = $1::int
@@ -377,8 +377,8 @@ export default async function familyRoutes(fastify: FastifyInstance) {
         return [];
       }
       const p = periodResult.rows[0];
-      fromDate = p.starts_at.toISOString().slice(0, 10);
-      toDate = `${p.ends_at.toISOString().slice(0, 7)}-01`;
+      fromDate = p.starts_at;
+      toDate = `${p.ends_month}-01`;
     }
 
     const discountHistoryResult = await fastify.db.query(
@@ -429,6 +429,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       ${monthlyDiscountCte}
       SELECT
         ms.month_start,
+        to_char(ms.month_start, 'YYYY-MM') AS month_key,
         ms.schedule_name,
         s.id AS student_id,
         s.name AS student_name,
@@ -466,7 +467,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
     }>();
 
     for (const row of result.rows) {
-      const key = row.month_start.toISOString().slice(0, 7);
+      const key = row.month_key;
       if (!monthsMap.has(key)) {
         monthsMap.set(key, {
           month: key,

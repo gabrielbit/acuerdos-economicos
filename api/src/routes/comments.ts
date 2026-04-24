@@ -18,6 +18,19 @@ export default async function commentRoutes(fastify: FastifyInstance) {
     preHandler: [fastify.requireAuth],
   }, async (request) => {
     const { entity_type, entity_id } = querySchema.parse(request.query);
+    if (entity_type === 'family') {
+      const result = await fastify.db.query(`
+        SELECT c.*, u.name as user_name
+        FROM comments c
+        JOIN users u ON u.id = c.user_id
+        LEFT JOIN agreements a ON c.entity_type = 'agreement' AND a.id = c.entity_id
+        WHERE (c.entity_type = 'family' AND c.entity_id = $1)
+          OR (c.entity_type = 'agreement' AND a.family_id = $1)
+        ORDER BY c.created_at DESC
+      `, [entity_id]);
+      return result.rows;
+    }
+
     const result = await fastify.db.query(`
       SELECT c.*, u.name as user_name
       FROM comments c
@@ -83,32 +96,47 @@ export default async function commentRoutes(fastify: FastifyInstance) {
     return result.rows;
   });
 
-  // Backward-compatible routes (agreement comments)
+  // Backward-compatible routes: agreement comments now resolve to family comments.
   fastify.get('/api/agreements/:id/comments', {
     preHandler: [fastify.requireAuth],
-  }, async (request) => {
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const agreement = await fastify.db.query(
+      `SELECT family_id FROM agreements WHERE id = $1`,
+      [id]
+    );
+    if (agreement.rows.length === 0) {
+      return reply.status(404).send({ error: 'Acuerdo no encontrado' });
+    }
+
     const result = await fastify.db.query(`
       SELECT c.*, u.name as user_name
       FROM comments c
       JOIN users u ON u.id = c.user_id
-      WHERE c.entity_type = 'agreement' AND c.entity_id = $1
+      WHERE c.entity_type = 'family' AND c.entity_id = $1
       ORDER BY c.created_at DESC
-    `, [id]);
+    `, [agreement.rows[0].family_id]);
     return result.rows;
   });
 
   fastify.post('/api/agreements/:id/comments', {
     preHandler: [fastify.requirePermission('canComment')],
-  }, async (request) => {
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { content } = createCommentSchema.parse(request.body);
+    const agreement = await fastify.db.query(
+      `SELECT family_id FROM agreements WHERE id = $1`,
+      [id]
+    );
+    if (agreement.rows.length === 0) {
+      return reply.status(404).send({ error: 'Acuerdo no encontrado' });
+    }
 
     const result = await fastify.db.query(`
       INSERT INTO comments (entity_type, entity_id, user_id, content)
-      VALUES ('agreement', $1, $2, $3)
+      VALUES ('family', $1, $2, $3)
       RETURNING *
-    `, [id, request.user.userId, content]);
+    `, [agreement.rows[0].family_id, request.user.userId, content]);
 
     const comment = await fastify.db.query(`
       SELECT c.*, u.name as user_name

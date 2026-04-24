@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { FeeSchedule } from '../../types';
+import { formatDateOnly } from '../../utils/format';
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('es-AR', {
@@ -194,7 +195,7 @@ export default function FeeSchedules() {
                     )}
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    Desde {new Date(fs.effective_from).toLocaleDateString('es-AR')} — Presupuesto: {formatMoney(fs.total_budget)}
+                    Desde {formatDateOnly(fs.effective_from)} — Presupuesto: {formatMoney(fs.total_budget)}
                   </p>
                 </div>
               </div>

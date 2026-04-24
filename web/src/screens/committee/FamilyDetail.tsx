@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import type { Family, Student, Agreement, Comment, MonthlySavingsEntry } from '../../types';
+import { formatMonthYear as formatDateOnlyMonthYear, localMonthKey } from '../../utils/format';
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('es-AR', {
@@ -42,7 +43,7 @@ function monthToEndDate(month: string): string {
 }
 
 function formatMonthYear(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  return formatDateOnlyMonthYear(dateStr, 'long');
 }
 
 const LEVEL_LABELS: Record<string, string> = {
@@ -101,8 +102,8 @@ export default function FamilyDetail() {
   const { id } = useParams<{ id: string }>();
   const [family, setFamily] = useState<(Family & { students: Student[] }) | null>(null);
   const [agreement, setAgreement] = useState<Agreement | null>(null);
-  const [agreementComments, setAgreementComments] = useState<Comment[]>([]);
-  const [newAgreementComment, setNewAgreementComment] = useState('');
+  const [familyComments, setFamilyComments] = useState<Comment[]>([]);
+  const [newFamilyComment, setNewFamilyComment] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [familyNotes, setFamilyNotes] = useState('');
@@ -158,23 +159,20 @@ export default function FamilyDetail() {
   const loadData = async () => {
     if (!id) return;
     const familyId = Number(id);
-    const [f, agreements] = await Promise.all([
+    const [f, agreements, comments] = await Promise.all([
       api.getFamily(familyId),
       api.getAgreements(),
+      api.getComments('family', familyId),
     ]);
     const a = agreements.find((a) => a.family_id === familyId) ?? null;
     setFamily(f);
     setAgreement(a);
     setFamilyNotes(f.notes ?? '');
+    setFamilyComments(comments);
     if (a) {
-      const [ac, savings] = await Promise.all([
-        api.getComments('agreement', a.id),
-        api.getMonthlySavings(familyId),
-      ]);
-      setAgreementComments(ac);
+      const savings = await api.getMonthlySavings(familyId);
       setMonthlySavings(savings);
     } else {
-      setAgreementComments([]);
       setMonthlySavings([]);
     }
   };
@@ -438,13 +436,13 @@ export default function FamilyDetail() {
     }
   };
 
-  const handleAddAgreementComment = async () => {
-    if (!newAgreementComment.trim() || !agreement) return;
+  const handleAddFamilyComment = async () => {
+    if (!newFamilyComment.trim() || !family) return;
     setSendingComment(true);
     try {
-      const comment = await api.addComment('agreement', agreement.id, newAgreementComment.trim());
-      setAgreementComments((prev) => [comment, ...prev]);
-      setNewAgreementComment('');
+      const comment = await api.addComment('family', family.id, newFamilyComment.trim());
+      setFamilyComments((prev) => [comment, ...prev]);
+      setNewFamilyComment('');
     } finally {
       setSendingComment(false);
     }
@@ -457,7 +455,7 @@ export default function FamilyDetail() {
   const agreementStudentsById = new Map(
     (agreement?.students ?? []).map((as) => [as.student_id, as])
   );
-  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  const currentMonthKey = localMonthKey();
   const totalAgreementSavings = monthlySavings.reduce((sum, entry) => sum + entry.total_savings, 0);
   const savingsUntilToday = monthlySavings
     .filter((entry) => entry.month <= currentMonthKey)
@@ -780,7 +778,6 @@ export default function FamilyDetail() {
                     if (!confirm('¿Eliminar este acuerdo? Esta acción no se puede deshacer.')) return;
                     await api.deleteAgreement(agreement.id);
                     setAgreement(null);
-                    setAgreementComments([]);
                     setMonthlySavings([]);
                   }}
                     className="text-xs text-red-400 hover:text-red-600">Borrar acuerdo</button>
@@ -1227,11 +1224,10 @@ export default function FamilyDetail() {
           </div>
         </div>
 
-        {agreement && (
-          <div className="bg-white rounded-xl border border-gray-200">
+        <div className="bg-white rounded-xl border border-gray-200">
             <div className="p-4 border-b border-gray-100">
               <h2 className="text-sm font-medium text-gray-900">
-                Comentarios del acuerdo {agreementComments.length > 0 && <span className="text-gray-400 font-normal">({agreementComments.length})</span>}
+                Comentarios de la familia {familyComments.length > 0 && <span className="text-gray-400 font-normal">({familyComments.length})</span>}
               </h2>
             </div>
 
@@ -1239,16 +1235,16 @@ export default function FamilyDetail() {
               <div className="p-4 border-b border-gray-100">
                 <div className="flex gap-3">
                   <textarea
-                    value={newAgreementComment}
-                    onChange={(e) => setNewAgreementComment(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddAgreementComment(); } }}
-                    placeholder="Comentario sobre el acuerdo..."
+                    value={newFamilyComment}
+                    onChange={(e) => setNewFamilyComment(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddFamilyComment(); } }}
+                    placeholder="Comentario sobre la familia..."
                     rows={2}
                     className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
                   />
                   <button
-                    onClick={handleAddAgreementComment}
-                    disabled={!newAgreementComment.trim() || sendingComment}
+                    onClick={handleAddFamilyComment}
+                    disabled={!newFamilyComment.trim() || sendingComment}
                     className="self-end px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
                   >
                     {sendingComment ? '...' : 'Enviar'}
@@ -1257,11 +1253,11 @@ export default function FamilyDetail() {
               </div>
             )}
 
-            {agreementComments.length === 0 ? (
+            {familyComments.length === 0 ? (
               <p className="px-4 py-6 text-sm text-gray-400 text-center">Sin comentarios aún</p>
             ) : (
               <div className="divide-y divide-gray-50">
-                {agreementComments.map((c) => (
+                {familyComments.map((c) => (
                   <div key={c.id} className="px-4 py-3">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-gray-900">{c.user_name}</span>
@@ -1273,7 +1269,6 @@ export default function FamilyDetail() {
               </div>
             )}
           </div>
-        )}
       </div>
     </div>
   );

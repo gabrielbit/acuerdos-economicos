@@ -11,16 +11,14 @@ import {
 } from 'recharts';
 import { api } from '../../services/api';
 import type { BudgetHistoryEntry, BudgetSummary } from '../../types';
-import { formatMoney } from '../../utils/format';
+import { formatMoney, localMonthKey, parseDateOnlyLocal } from '../../utils/format';
 
 function monthShortLabel(ym: string): string {
-  const [year, month] = ym.split('-').map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
+  return parseDateOnlyLocal(`${ym}-01`).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
 }
 
 function monthLongLabel(ym: string): string {
-  const [year, month] = ym.split('-').map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' });
+  return parseDateOnlyLocal(`${ym}-01`).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' });
 }
 
 export default function Metricas() {
@@ -55,7 +53,7 @@ export default function Metricas() {
   };
 
   const chartData = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonth = localMonthKey();
     return [...history]
       .sort((a, b) => a.month.localeCompare(b.month))
       .map((row) => ({

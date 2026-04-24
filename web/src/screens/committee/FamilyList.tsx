@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import type { Agreement, Family, Student } from '../../types';
 import FamilyFilters from '../../components/FamilyFilters';
+import { formatMonthYear, localDateKey } from '../../utils/format';
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('es-AR', {
@@ -158,7 +159,7 @@ export default function FamilyList() {
         month: 'long',
         year: 'numeric',
       });
-      const fileDate = new Date().toISOString().slice(0, 10);
+      const fileDate = localDateKey();
       const reportTitle = `Reporte de Acuerdos Economicos - ${fileDate}`;
 
       const rowsHtml = familyDetails.map((family) => {
@@ -184,9 +185,9 @@ export default function FamilyList() {
         const familyType = (family.family_type ?? 'familia') === 'docente' ? 'Docente' : 'Familia';
         const periodLabel = agreement?.impact_starts_at || agreement?.expires_at
           ? `${agreement.impact_starts_at
-            ? new Date(agreement.impact_starts_at).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })
+            ? formatMonthYear(agreement.impact_starts_at, 'short')
             : 'Actual'} - ${agreement.expires_at
-            ? new Date(agreement.expires_at).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })
+            ? formatMonthYear(agreement.expires_at, 'short')
             : 'Actual'}`
           : 'Actual';
         const observations = family.notes?.trim();

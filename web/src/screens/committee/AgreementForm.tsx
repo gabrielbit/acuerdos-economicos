@@ -19,6 +19,16 @@ const LEVEL_LABELS: Record<string, string> = {
   '12vo': '12vo',
 };
 
+function monthToStartDate(month: string): string {
+  return `${month}-01`;
+}
+
+function monthToEndDate(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return `${month}-${String(lastDay).padStart(2, '0')}`;
+}
+
 interface StudentPreview {
   student: Student;
   baseTuition: number;
@@ -37,6 +47,8 @@ export default function AgreementForm() {
   const [activePeriod, setActivePeriod] = useState<AidPeriod | null>(null);
 
   const [discountInput, setDiscountInput] = useState('');
+  const [impactStartMonth, setImpactStartMonth] = useState('2026-02');
+  const [impactEndMonth, setImpactEndMonth] = useState('2026-08');
   const [observations, setObservations] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -86,6 +98,8 @@ export default function AgreementForm() {
         family_id: Number(familyId),
         period_id: activePeriod.id,
         discount_percentage: discount,
+        impact_starts_at: monthToStartDate(impactStartMonth),
+        expires_at: monthToEndDate(impactEndMonth),
         observations: observations || undefined,
       });
       navigate(`/familias/${familyId}`);
@@ -112,26 +126,45 @@ export default function AgreementForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Descuento */}
-        <div className="max-w-xs">
-          <label className="block text-sm font-medium text-gray-700 mb-1">% Descuento</label>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={discountInput}
-            onChange={(e) => {
-              const digitsOnly = e.target.value.replace(/\D/g, '');
-              if (digitsOnly === '') {
-                setDiscountInput('');
-                return;
-              }
-              const withoutLeadingZeros = digitsOnly.replace(/^0+(?=\d)/, '');
-              const clamped = Math.min(100, Number(withoutLeadingZeros));
-              setDiscountInput(String(clamped));
-            }}
-            placeholder="Ej: 45"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-          />
+        <div className="grid grid-cols-3 gap-4 max-w-2xl">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">% Descuento</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={discountInput}
+              onChange={(e) => {
+                const digitsOnly = e.target.value.replace(/\D/g, '');
+                if (digitsOnly === '') {
+                  setDiscountInput('');
+                  return;
+                }
+                const withoutLeadingZeros = digitsOnly.replace(/^0+(?=\d)/, '');
+                const clamped = Math.min(100, Number(withoutLeadingZeros));
+                setDiscountInput(String(clamped));
+              }}
+              placeholder="Ej: 45"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Impacta desde</label>
+            <input
+              type="month"
+              value={impactStartMonth}
+              onChange={(e) => setImpactStartMonth(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
+            <input
+              type="month"
+              value={impactEndMonth}
+              onChange={(e) => setImpactEndMonth(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+          </div>
         </div>
 
         {/* Preview por hijo */}
@@ -201,7 +234,7 @@ export default function AgreementForm() {
         <div className="flex gap-3">
           <button
             type="submit"
-            disabled={saving || discount === 0}
+            disabled={saving || discount === 0 || !impactStartMonth || !impactEndMonth}
             className="px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
           >
             {saving ? 'Guardando...' : 'Crear acuerdo'}

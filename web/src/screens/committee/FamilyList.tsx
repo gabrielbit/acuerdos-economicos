@@ -182,8 +182,12 @@ export default function FamilyList() {
         const familyStatus = STATUS_LABELS[family.status]?.label ?? family.status;
         const familyStatusClass = PDF_STATUS_CLASSES[family.status] ?? 'status-default';
         const familyType = (family.family_type ?? 'familia') === 'docente' ? 'Docente' : 'Familia';
-        const periodLabel = agreement?.expires_at
-          ? `Hasta ${new Date(agreement.expires_at).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })}`
+        const periodLabel = agreement?.impact_starts_at || agreement?.expires_at
+          ? `${agreement.impact_starts_at
+            ? new Date(agreement.impact_starts_at).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })
+            : 'Actual'} - ${agreement.expires_at
+            ? new Date(agreement.expires_at).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })
+            : 'Actual'}`
           : 'Actual';
         const observations = agreement?.observations?.trim();
 

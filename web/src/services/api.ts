@@ -96,6 +96,7 @@ export const api = {
     period_id: number;
     discount_percentage: number;
     observations?: string;
+    impact_starts_at?: string;
     expires_at?: string;
     status?: string;
   }) =>

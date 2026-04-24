@@ -6,6 +6,7 @@ const createAgreementSchema = z.object({
   period_id: z.number().int().positive(),
   discount_percentage: z.number().min(0).max(100),
   observations: z.string().optional(),
+  impact_starts_at: z.string().optional(),
   expires_at: z.string().optional(),
 });
 
@@ -85,8 +86,8 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
 
       // Crear acuerdo (sin campo status — el status vive en la familia)
       const agreementResult = await client.query(
-        `INSERT INTO agreements (family_id, period_id, discount_percentage, observations, approved_by, granted_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, NOW(), $6::date)
+        `INSERT INTO agreements (family_id, period_id, discount_percentage, observations, approved_by, granted_at, impact_starts_at, expires_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), $6::date, $7::date)
          RETURNING *`,
         [
           data.family_id,
@@ -94,6 +95,7 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
           data.discount_percentage,
           data.observations,
           request.user.userId,
+          data.impact_starts_at ?? '2026-02-01',
           data.expires_at ?? '2026-08-31',
         ]
       );
@@ -184,10 +186,11 @@ export default async function agreementRoutes(fastify: FastifyInstance) {
         `UPDATE agreements SET
           discount_percentage = COALESCE($1, discount_percentage),
           observations = COALESCE($2, observations),
-          expires_at = COALESCE($3::date, expires_at),
+          impact_starts_at = COALESCE($3::date, impact_starts_at),
+          expires_at = COALESCE($4::date, expires_at),
           updated_at = NOW()
-        WHERE id = $4 RETURNING *`,
-        [data.discount_percentage, data.observations, data.expires_at, id]
+        WHERE id = $5 RETURNING *`,
+        [data.discount_percentage, data.observations, data.impact_starts_at, data.expires_at, id]
       );
 
       // Si cambió el descuento, recalcular montos por estudiante

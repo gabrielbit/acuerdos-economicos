@@ -27,6 +27,24 @@ function timeAgo(dateStr: string): string {
   return date.toLocaleDateString('es-AR');
 }
 
+function dateToMonthInput(dateStr: string | null | undefined, fallback: string): string {
+  return dateStr ? dateStr.slice(0, 7) : fallback;
+}
+
+function monthToStartDate(month: string): string {
+  return `${month}-01`;
+}
+
+function monthToEndDate(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return `${month}-${String(lastDay).padStart(2, '0')}`;
+}
+
+function formatMonthYear(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+}
+
 const LEVEL_LABELS: Record<string, string> = {
   jardin: 'Jardín',
   primaria: 'Primaria',
@@ -79,7 +97,8 @@ export default function FamilyDetail() {
   const [editing, setEditing] = useState(false);
   const [editDiscount, setEditDiscount] = useState(0);
   const [editObs, setEditObs] = useState('');
-  const [editExpiresAt, setEditExpiresAt] = useState('');
+  const [editImpactStartMonth, setEditImpactStartMonth] = useState('2026-02');
+  const [editImpactEndMonth, setEditImpactEndMonth] = useState('2026-08');
   const [saving, setSaving] = useState(false);
 
   // Invitación
@@ -264,7 +283,8 @@ export default function FamilyDetail() {
     if (!agreement) return;
     setEditDiscount(Number(agreement.discount_percentage));
     setEditObs(agreement.observations ?? '');
-    setEditExpiresAt(agreement.expires_at ? agreement.expires_at.slice(0, 10) : '2026-08-31');
+    setEditImpactStartMonth(dateToMonthInput(agreement.impact_starts_at, '2026-02'));
+    setEditImpactEndMonth(dateToMonthInput(agreement.expires_at, '2026-08'));
     setEditing(true);
   };
 
@@ -275,7 +295,8 @@ export default function FamilyDetail() {
       await api.updateAgreement(agreement.id, {
         discount_percentage: editDiscount,
         observations: editObs || undefined,
-        expires_at: editExpiresAt || undefined,
+        impact_starts_at: monthToStartDate(editImpactStartMonth),
+        expires_at: monthToEndDate(editImpactEndMonth),
       });
       setEditing(false);
       setLoading(true);
@@ -748,14 +769,20 @@ export default function FamilyDetail() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Caducidad</label>
-                <input type="date" value={editExpiresAt}
-                  onChange={(e) => setEditExpiresAt(e.target.value)}
+                <label className="block text-xs text-gray-500 mb-1">Impacta desde</label>
+                <input type="month" value={editImpactStartMonth}
+                  onChange={(e) => setEditImpactStartMonth(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
               </div>
-              <div className="col-span-2 flex items-end">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+                <input type="month" value={editImpactEndMonth}
+                  onChange={(e) => setEditImpactEndMonth(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div className="flex items-end">
                 <div className="flex gap-2">
-                  <button onClick={saveAgreement} disabled={saving}
+                  <button onClick={saveAgreement} disabled={saving || !editImpactStartMonth || !editImpactEndMonth}
                     className="px-3 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50">
                     {saving ? 'Guardando...' : 'Guardar'}
                   </button>
@@ -931,14 +958,17 @@ export default function FamilyDetail() {
             })}
           </tbody>
         </table>
-        {agreement && !editing && (agreement.observations || agreement.granted_at || agreement.expires_at) && (
+        {agreement && !editing && (agreement.observations || agreement.granted_at || agreement.impact_starts_at || agreement.expires_at) && (
           <div className="px-4 py-3 border-t border-gray-100 space-y-2">
             <div className="flex gap-6 text-xs text-gray-400">
               {agreement.granted_at && (
                 <span>Otorgado el {new Date(agreement.granted_at).toLocaleDateString('es-AR')}</span>
               )}
+              {agreement.impact_starts_at && (
+                <span>Impacta desde {formatMonthYear(agreement.impact_starts_at)}</span>
+              )}
               {agreement.expires_at && (
-                <span>Caduca el {new Date(agreement.expires_at).toLocaleDateString('es-AR')}</span>
+                <span>Hasta {formatMonthYear(agreement.expires_at)}</span>
               )}
             </div>
             {agreement.observations && (

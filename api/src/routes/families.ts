@@ -38,7 +38,7 @@ export default async function familyRoutes(fastify: FastifyInstance) {
       LEFT JOIN students s ON s.family_id = f.id
       LEFT JOIN agreements a ON a.family_id = f.id
         AND a.period_id = COALESCE($1::int, (SELECT id FROM aid_periods WHERE is_active = true LIMIT 1))
-      LEFT JOIN agreement_students ast ON ast.agreement_id = a.id
+      LEFT JOIN agreement_students ast ON ast.agreement_id = a.id AND ast.student_id = s.id
       GROUP BY f.id, a.discount_percentage
       ORDER BY f.name
     `, [period_id ?? null]);

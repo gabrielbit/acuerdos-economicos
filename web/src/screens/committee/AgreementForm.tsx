@@ -19,6 +19,16 @@ const LEVEL_LABELS: Record<string, string> = {
   '12vo': '12vo',
 };
 
+const AGREEMENT_MONTH_OPTIONS = [
+  { value: '2026-02', label: 'Febrero 2026' },
+  { value: '2026-03', label: 'Marzo 2026' },
+  { value: '2026-04', label: 'Abril 2026' },
+  { value: '2026-05', label: 'Mayo 2026' },
+  { value: '2026-06', label: 'Junio 2026' },
+  { value: '2026-07', label: 'Julio 2026' },
+  { value: '2026-08', label: 'Agosto 2026' },
+];
+
 function monthToStartDate(month: string): string {
   return `${month}-01`;
 }
@@ -149,21 +159,27 @@ export default function AgreementForm() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Impacta desde</label>
-            <input
-              type="month"
+            <select
               value={impactStartMonth}
               onChange={(e) => setImpactStartMonth(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-            />
+            >
+              {AGREEMENT_MONTH_OPTIONS.map((month) => (
+                <option key={month.value} value={month.value}>{month.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
-            <input
-              type="month"
+            <select
               value={impactEndMonth}
               onChange={(e) => setImpactEndMonth(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-            />
+            >
+              {AGREEMENT_MONTH_OPTIONS.map((month) => (
+                <option key={month.value} value={month.value}>{month.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 

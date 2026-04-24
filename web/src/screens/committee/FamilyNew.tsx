@@ -17,8 +17,8 @@ const GRADE_OPTIONS = [
   { value: '8vo', label: '8vo' },
   { value: '9no', label: '9no' },
   { value: '10mo', label: '10mo' },
-  { value: '11avo', label: '11avo' },
-  { value: '12 avo', label: '12 avo' },
+  { value: '11vo', label: '11vo' },
+  { value: '12vo', label: '12vo' },
 ];
 
 export default function FamilyNew() {

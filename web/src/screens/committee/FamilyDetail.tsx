@@ -63,6 +63,16 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   suspendido: { label: 'Vencido', className: 'bg-gray-100 text-gray-500' },
 };
 
+const AGREEMENT_MONTH_OPTIONS = [
+  { value: '2026-02', label: 'Febrero 2026' },
+  { value: '2026-03', label: 'Marzo 2026' },
+  { value: '2026-04', label: 'Abril 2026' },
+  { value: '2026-05', label: 'Mayo 2026' },
+  { value: '2026-06', label: 'Junio 2026' },
+  { value: '2026-07', label: 'Julio 2026' },
+  { value: '2026-08', label: 'Agosto 2026' },
+];
+
 const GRADE_OPTIONS = [
   { value: 'Jardin', label: 'Jardín' },
   ...Array.from({ length: 7 }, (_, i) => {
@@ -72,8 +82,8 @@ const GRADE_OPTIONS = [
   { value: '8vo', label: '8vo' },
   { value: '9no', label: '9no' },
   { value: '10mo', label: '10mo' },
-  { value: '11avo', label: '11avo' },
-  { value: '12 avo', label: '12 avo' },
+  { value: '11vo', label: '11vo' },
+  { value: '12vo', label: '12vo' },
 ];
 
 export default function FamilyDetail() {
@@ -770,15 +780,23 @@ export default function FamilyDetail() {
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Impacta desde</label>
-                <input type="month" value={editImpactStartMonth}
+                <select value={editImpactStartMonth}
                   onChange={(e) => setEditImpactStartMonth(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                  {AGREEMENT_MONTH_OPTIONS.map((month) => (
+                    <option key={month.value} value={month.value}>{month.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Hasta</label>
-                <input type="month" value={editImpactEndMonth}
+                <select value={editImpactEndMonth}
                   onChange={(e) => setEditImpactEndMonth(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                  {AGREEMENT_MONTH_OPTIONS.map((month) => (
+                    <option key={month.value} value={month.value}>{month.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="flex items-end">
                 <div className="flex gap-2">

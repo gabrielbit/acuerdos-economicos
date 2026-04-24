@@ -210,3 +210,10 @@ export interface BudgetHistoryEntry {
   amount_dropped: number;
   dropped_percentage: number;
 }
+
+export interface BudgetProjectionEntry {
+  month: string;
+  total_budget: number;
+  granted_assigned: number;
+  granted_in_definition: number;
+}

@@ -115,6 +115,8 @@ export const api = {
     request<import('../types').BudgetSummary>(`/budget/summary${periodId ? `?period_id=${periodId}` : ''}`),
   getBudgetHistory: (months = 12) =>
     request<import('../types').BudgetHistoryEntry[]>(`/budget/history?months=${months}`),
+  getBudgetProjection: () =>
+    request<import('../types').BudgetProjectionEntry[]>('/budget/projection'),
 
   // Configuración editable
   getSetting: (key: string) =>

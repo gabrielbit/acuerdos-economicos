@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import { api } from '../../services/api';
-import type { BudgetHistoryEntry, BudgetSummary } from '../../types';
+import type { BudgetHistoryEntry, BudgetProjectionEntry, BudgetSummary } from '../../types';
 import { formatMoney, localMonthKey, parseDateOnlyLocal } from '../../utils/format';
 
 function monthShortLabel(ym: string): string {
@@ -27,14 +30,17 @@ export default function Metricas() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyMonths, setHistoryMonths] = useState(12);
   const [history, setHistory] = useState<BudgetHistoryEntry[]>([]);
+  const [projection, setProjection] = useState<BudgetProjectionEntry[]>([]);
 
   useEffect(() => {
     Promise.all([
       api.getBudgetSummary().catch(() => null),
       api.getBudgetHistory(12).catch(() => []),
-    ]).then(([b, historyData]) => {
+      api.getBudgetProjection().catch(() => []),
+    ]).then(([b, historyData, projectionData]) => {
       setBudget(b);
       setHistory(historyData);
+      setProjection(projectionData);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -63,6 +69,13 @@ export default function Metricas() {
         Bajas: row.amount_dropped,
       }));
   }, [budget?.granted_in_definition, history]);
+
+  const projectionChartData = useMemo(() => projection.map((row) => ({
+    mes: monthShortLabel(row.month),
+    Presupuesto: row.total_budget,
+    Otorgado: row.granted_assigned,
+    'En proceso': row.granted_in_definition,
+  })), [projection]);
 
   if (loading) {
     return <p className="text-sm text-gray-500 py-8 text-center">Cargando...</p>;
@@ -154,6 +167,72 @@ export default function Metricas() {
             Proyección lineal con velocidad y beca promedio; no considera familias en definición.
           </p>
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="p-2 pb-4 border-b border-gray-100 mb-4">
+          <h2 className="text-sm font-medium text-gray-900">Compromiso proyectado vs presupuesto</h2>
+          <p className="text-xs text-gray-400 mt-1">
+            Febrero a febrero: presupuesto como línea de techo; otorgado y en proceso como áreas apiladas.
+          </p>
+        </div>
+        {projectionChartData.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">Sin datos para la proyección.</p>
+        ) : (
+          <div className="h-80 w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={projectionChartData} margin={{ top: 10, right: 10, left: 8, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="grantedArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#16a34a" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#16a34a" stopOpacity={0.08} />
+                  </linearGradient>
+                  <linearGradient id="processArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.38} />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-gray-100" />
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} className="text-gray-500" />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  className="text-gray-500"
+                  tickFormatter={(v) => formatMoney(Number(v))}
+                />
+                <Tooltip
+                  formatter={(value: number) => formatMoney(value)}
+                  labelStyle={{ color: '#374151' }}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                />
+                <Legend />
+                <Area
+                  type="monotone"
+                  dataKey="Otorgado"
+                  stackId="commitment"
+                  fill="url(#grantedArea)"
+                  stroke="#16a34a"
+                  name="Otorgado"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="En proceso"
+                  stackId="commitment"
+                  fill="url(#processArea)"
+                  stroke="#f59e0b"
+                  name="En proceso"
+                />
+                <Line
+                  type="stepAfter"
+                  dataKey="Presupuesto"
+                  stroke="#111827"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Presupuesto"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-4">

@@ -283,4 +283,88 @@ export default async function budgetRoutes(fastify: FastifyInstance) {
       };
     });
   });
+
+  fastify.get('/api/budget/projection', {
+    preHandler: [fastify.requireCommittee],
+  }, async () => {
+    const discountHistoryResult = await fastify.db.query<{ exists: boolean }>(
+      `SELECT to_regclass('public.agreement_discount_changes') IS NOT NULL AS exists`
+    );
+    const hasDiscountHistory = discountHistoryResult.rows[0]?.exists === true;
+    const discountExpression = hasDiscountHistory
+      ? `COALESCE((
+          SELECT adc.discount_percentage
+          FROM agreement_discount_changes adc
+          WHERE adc.agreement_id = a.id
+            AND adc.effective_from <= ms.month_start
+          ORDER BY adc.effective_from DESC, adc.created_at DESC
+          LIMIT 1
+        ), a.discount_percentage)`
+      : `a.discount_percentage`;
+
+    const result = await fastify.db.query(`
+      WITH bounds AS (
+        SELECT make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, 2, 1)::date AS starts_at
+      ),
+      month_series AS (
+        SELECT generate_series(b.starts_at, b.starts_at + INTERVAL '12 months', '1 month')::date AS month_start
+        FROM bounds b
+      ),
+      active_period AS (
+        SELECT id, year, start_month, end_month
+        FROM aid_periods
+        WHERE is_active = true
+        LIMIT 1
+      ),
+      monthly_budgets AS (
+        SELECT
+          ms.month_start,
+          fs.id AS schedule_id,
+          COALESCE(fs.total_budget, 0)::numeric AS total_budget
+        FROM month_series ms
+        LEFT JOIN LATERAL (
+          SELECT id, total_budget
+          FROM fee_schedules
+          WHERE effective_from <= ms.month_start
+          ORDER BY effective_from DESC
+          LIMIT 1
+        ) fs ON true
+      ),
+      agreement_months AS (
+        SELECT
+          ms.month_start,
+          f.status::text AS family_status,
+          ROUND((fsr.tuition_amount * (${discountExpression}) / 100.0)::numeric, 2) AS discount_amount
+        FROM month_series ms
+        JOIN active_period ap ON true
+        JOIN monthly_budgets mb ON mb.month_start = ms.month_start
+        JOIN agreements a ON a.period_id = ap.id
+          AND date_trunc('month', COALESCE(a.impact_starts_at, make_date(ap.year, ap.start_month, 1))) <= ms.month_start
+          AND date_trunc('month', COALESCE(a.expires_at, make_date(ap.year, ap.end_month, 1))) >= ms.month_start
+        JOIN families f ON f.id = a.family_id
+        JOIN students s ON s.family_id = f.id
+        JOIN fee_schedule_rates fsr ON fsr.fee_schedule_id = mb.schedule_id
+          AND fsr.level = CASE WHEN s.grade = '12vo' THEN '12vo'::education_level ELSE s.level END
+      )
+      SELECT
+        to_char(ms.month_start, 'YYYY-MM') AS month,
+        mb.total_budget,
+        COALESCE(SUM(am.discount_amount) FILTER (WHERE am.family_status = 'otorgado'), 0)::numeric AS granted_assigned,
+        COALESCE(SUM(am.discount_amount) FILTER (
+          WHERE am.family_status IN ('solicitud','formulario_enviado','formulario_completado','agendado','en_definicion')
+        ), 0)::numeric AS granted_in_definition
+      FROM month_series ms
+      JOIN monthly_budgets mb ON mb.month_start = ms.month_start
+      LEFT JOIN agreement_months am ON am.month_start = ms.month_start
+      GROUP BY ms.month_start, mb.total_budget
+      ORDER BY ms.month_start ASC
+    `);
+
+    return result.rows.map((row) => ({
+      month: row.month,
+      total_budget: Number(row.total_budget),
+      granted_assigned: Number(row.granted_assigned),
+      granted_in_definition: Number(row.granted_in_definition),
+    }));
+  });
 }

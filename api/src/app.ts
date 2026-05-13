@@ -46,7 +46,11 @@ export async function buildApp() {
   await fastify.register(feeScheduleRoutes);
   await fastify.register(settingsRoutes);
 
-  fastify.get('/api/health', async () => ({ status: 'ok' }));
+  fastify.get('/api/health', async () => {
+    await fastify.db.query('SELECT 1');
+
+    return { status: 'ok', database: 'ok' };
+  });
 
   return fastify;
 }

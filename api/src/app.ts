@@ -20,6 +20,30 @@ export async function buildApp() {
     logger: true,
   });
 
+  // El adaptador de Fastify en Vercel puede reenviar requests sin cuerpo
+  // (p.ej. DELETE) con un content-type que Fastify no sabe parsear, lo que
+  // dispara FST_ERR_CTP_INVALID_MEDIA_TYPE (415). Registramos un parser
+  // catch-all tolerante a cuerpos vacíos: el parseo de application/json sigue
+  // usando el parser nativo (este solo aplica cuando no hay parser específico).
+  fastify.addContentTypeParser('*', (_request, payload, done) => {
+    let data = '';
+    payload.on('data', (chunk) => {
+      data += chunk;
+    });
+    payload.on('end', () => {
+      if (!data) {
+        done(null, undefined);
+        return;
+      }
+      try {
+        done(null, JSON.parse(data));
+      } catch {
+        done(null, data);
+      }
+    });
+    payload.on('error', done);
+  });
+
   const corsOrigin = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
     : ['http://localhost:5173'];
